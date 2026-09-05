@@ -1,0 +1,140 @@
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+import { readFile } from 'node:fs/promises';
+import { OfflineAudioContext as NativeOfflineAudioContext } from 'node-web-audio-api';
+import { Mp3Encoder } from '@breezystack/lamejs';
+import { AudioEngine } from '../lib/music/audio';
+import { buildIntent } from '../lib/music/analyze';
+import { inferContext, resolveIntent } from '../lib/music/resolve';
+import type { Track } from '../lib/music/types';
+
+void test('real samples render non-silent bounded stereo audio and both exports decode', async () => {
+  const originalFetch = globalThis.fetch;
+  const originalOffline = globalThis.OfflineAudioContext;
+  globalThis.OfflineAudioContext =
+    NativeOfflineAudioContext as unknown as typeof OfflineAudioContext;
+  globalThis.fetch = async (input) => {
+    const path =
+      typeof input === 'string'
+        ? input
+        : input instanceof URL
+          ? input.href
+          : input.url;
+    assert.ok(path.startsWith('/samples/'));
+    const file = await readFile(new URL(`../public${path}`, import.meta.url));
+    return new Response(file);
+  };
+  const decoder = new NativeOfflineAudioContext(2, 44100, 44100);
+  const engine = new AudioEngine();
+  // The decoder needs no hardware device. Production rendering remains unmodified.
+  engine.ready = async () => decoder as unknown as AudioContext;
+  try {
+    const intent = buildIntent(
+      'hum',
+      [60, 64, 67].map((pitch, i) => ({
+        time: i * 0.5,
+        duration: 0.4,
+        pitch,
+        confidence: 1,
+        intensity: 0.8,
+      })),
+      2,
+    );
+    const context = inferContext(intent);
+    const track: Track = {
+      id: 'p',
+      instrument: 'piano',
+      name: 'Piano',
+      intent,
+      ...resolveIntent(intent, 'piano', context),
+      original: null,
+      muted: false,
+      smoother: false,
+    };
+    const rendered = await engine.render([track]);
+    const left = rendered.getChannelData(0),
+      right = rendered.getChannelData(1);
+    let peak = 0,
+      power = 0;
+    for (const value of left) {
+      assert.ok(Number.isFinite(value));
+      peak = Math.max(peak, Math.abs(value));
+      power += value * value;
+    }
+    assert.ok(peak > 0.01, `Silent render: peak ${peak}`);
+    assert.ok(peak <= 0.971);
+    assert.ok(Math.sqrt(power / left.length) > 0.005);
+    assert.equal(rendered.numberOfChannels, 2);
+    const wav = await engine.exportWav([track]);
+    const decoded = await decoder.decodeAudioData(await wav.arrayBuffer());
+    assert.equal(decoded.numberOfChannels, 2);
+    assert.ok(decoded.duration > 2);
+    const encoder = new Mp3Encoder(2, 44100, 192),
+      chunks: Uint8Array<ArrayBuffer>[] = [];
+    const toPCM = (channel: Float32Array) =>
+      Int16Array.from(
+        channel,
+        (value) => Math.max(-1, Math.min(1, value)) * 32767,
+      );
+    const l = toPCM(left),
+      r = toPCM(right);
+    for (let i = 0; i < l.length; i += 1152)
+      chunks.push(
+        new Uint8Array(
+          encoder.encodeBuffer(
+            l.subarray(i, i + 1152),
+            r.subarray(i, i + 1152),
+          ),
+        ),
+      );
+    chunks.push(new Uint8Array(encoder.flush()));
+    const mp3 = new Blob(chunks, { type: 'audio/mpeg' });
+    const decodedMp3 = await decoder.decodeAudioData(await mp3.arrayBuffer());
+    assert.ok(decodedMp3.duration >= rendered.duration);
+    assert.equal(decodedMp3.numberOfChannels, 2);
+    await assert.rejects(
+      engine.render([{ ...track, muted: true }]),
+      /turn its sound on/,
+    );
+  } finally {
+    globalThis.fetch = originalFetch;
+    globalThis.OfflineAudioContext = originalOffline;
+  }
+});
+
+void test('drum-only mix renders without fetching piano samples', async () => {
+  const previous = globalThis.OfflineAudioContext;
+  globalThis.OfflineAudioContext =
+    NativeOfflineAudioContext as unknown as typeof OfflineAudioContext;
+  try {
+    const engine = new AudioEngine(),
+      intent = buildIntent('touch', [], 2);
+    const track: Track = {
+      id: 'd',
+      instrument: 'drums',
+      name: 'Drums',
+      intent,
+      events: [
+        { time: 0, note: 36, duration: 0.16, velocity: 0.9 },
+        { time: 0.5, note: 38, duration: 0.16, velocity: 0.8 },
+        { time: 1, note: 42, duration: 0.1, velocity: 0.6 },
+      ],
+      duration: 2,
+      original: null,
+      muted: false,
+      smoother: false,
+    };
+    const buffer = await engine.render([track]);
+    for (const at of [0.02, 0.52, 1.02]) {
+      const data = buffer
+        .getChannelData(0)
+        .slice(Math.floor(at * 44100), Math.floor((at + 0.08) * 44100));
+      assert.ok(
+        data.some((value) => Math.abs(value) > 0.005),
+        `Missing drum at ${at}`,
+      );
+    }
+  } finally {
+    globalThis.OfflineAudioContext = previous;
+  }
+});
