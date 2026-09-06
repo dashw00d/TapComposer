@@ -14,7 +14,9 @@ npm run build
 npm start
 ```
 
-Microphone capture requires HTTPS or localhost and browser permission. Headphones reduce bleed while recording over existing parts. The private Sites publication may require its owner's sign-in.
+Microphone capture requires HTTPS or localhost and browser permission. Headphones reduce bleed while recording over existing parts. Open http://localhost:3000. This app runs as a local Node process and requires no ChatGPT account or hosted service.
+
+The local server reads `.env.local` (see `.env.example`). The configured GPU services can be started with `systemctl --user start tapcomposer-ace tapcomposer-gateway`. The app and both inference services bind only to loopback.
 
 ## Making a song
 
@@ -34,7 +36,7 @@ Keyboard: Space plays/stops when focus is outside an interactive control; Ctrl/C
 
 ## Architecture
 
-Free mode runs music processing on the device. Premium adds ACE-Step XL cover rendering through a server-authenticated inference gateway. The private demo includes Premium; account billing is not implemented. See [inference/README.md](./inference/README.md) for the GPU service, configuration, limits and operational requirements.
+Free mode runs music processing on the device. Premium adds ACE-Step XL cover rendering through the local GPU gateway. Both experiences are tested locally; the Premium label represents the future product tier. Account billing is not implemented. See [inference/README.md](./inference/README.md) for the GPU service, configuration, limits and operational requirements.
 
 | Module                             | Responsibility                                                                             |
 | ---------------------------------- | ------------------------------------------------------------------------------------------ |

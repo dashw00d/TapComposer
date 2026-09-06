@@ -1,7 +1,7 @@
 'use client';
 import { useEffect, useEffectEvent, useRef, useState } from 'react';
 import {
-  Cloud,
+  Cpu,
   Download,
   LoaderCircle,
   ShieldCheck,
@@ -344,16 +344,16 @@ export function PremiumStudio({
                     : service === null
                       ? 'Connecting…'
                       : service.ready
-                        ? 'Premium included in this demo'
+                        ? 'Premium demo · local GPU'
                         : service.premium
                           ? 'Studio offline · local composing still works'
                           : 'Premium service is not connected'}
                 </output>
               </div>
               <p className="premium-privacy">
-                <Cloud size={13} /> Sends this arrangement and your direction to
-                the studio. Finished takes are saved in this browser. Up to 3
-                minutes per take.
+                <Cpu size={13} /> Sends this arrangement and your direction to
+                the GPU service on this computer. Finished takes are saved in
+                this browser. Up to 3 minutes per take.
               </p>
             </>
           )}

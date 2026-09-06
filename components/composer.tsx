@@ -1138,9 +1138,10 @@ export default function Composer() {
               Recording, melody detection, playback, and export happen in your
               browser. Your songs and original recordings are stored here, on
               your device. Premium rendering sends the arranged audio and style
-              direction to our inference service when you choose “Make a studio
-              take.” Original microphone recordings stay here. Clearing your
-              browser’s data removes them. Download anything you want to keep.
+              direction to the GPU service on this computer when you choose
+              “Make a studio take.” Original microphone recordings stay here.
+              Clearing your browser’s data removes them. Download anything you
+              want to keep.
             </p>
             <p>
               Humming recognition uses{' '}

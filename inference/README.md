@@ -2,7 +2,7 @@
 
 Free mode runs recording, CREPE Tiny recognition, composition, arranging, sampled playback and exports on the device. It never submits audio for inference. Premium sends a rendered WAV of the **actual arrangement**, plus its tempo, key and style direction, to ACE-Step's cover task. Original microphone recordings are not uploaded. Results are separate takes; changing a take's source does not destroy either version.
 
-The private demo grants premium on the server with `TAPCOMPOSER_PREMIUM_DEMO=true`. This is a demo entitlement, not billing or a production subscription system. Before sharing publicly, replace this flag with authenticated account entitlements, per-account quotas, job ownership and billing. The gateway bearer credential must remain a server secret.
+The local demo grants premium on the server with `TAPCOMPOSER_PREMIUM_DEMO=true`. This is a demo entitlement, not billing or a production subscription system. Before sharing publicly, replace this flag with authenticated account entitlements, per-account quotas, job ownership and billing. The gateway bearer credential must remain a server secret.
 
 ## Runtime used by this demo
 
@@ -11,7 +11,7 @@ The private demo grants premium on the server with `TAPCOMPOSER_PREMIUM_DEMO=tru
 - NVIDIA RTX 4070 Ti SUPER, 16GB VRAM. CUDA, CPU offload, batch one, eight diffusion steps. Cover uses source conditioning and bypasses the LM planner, so a separate language model is not initialized for these jobs.
 - Source checkout, model weights and virtual environments live outside this git repository, in `../inference/`.
 - `gateway.py` accepts only bounded PCM WAV song jobs, checks metadata, queues up to three jobs and serves finished WAVs. ACE-Step's model management and filesystem API stay on loopback.
-- The demo uses a Cloudflare Quick Tunnel to the authenticated gateway. Its public URL contains no credential. The hosted Worker supplies the bearer key. **The GPU computer must remain online. A tunnel restart changes the URL**, which must then be updated in Sites and deployed. A paid service should use a stable inference origin with the same gateway API.
+- The Node app calls the gateway at `http://127.0.0.1:8789`, which calls ACE-Step at `http://127.0.0.1:8001`. All three processes bind to loopback. No tunnel or hosted app participates in local testing.
 
 ## Setup
 
@@ -38,17 +38,17 @@ ACESTEP_USE_FLASH_ATTENTION=false
 ACESTEP_COMPILE_MODEL=false
 ```
 
-Run `.venv/bin/acestep-api`. Install the pinned gateway requirements in a separate Python 3.11 virtual environment. Set a cryptographically random `TAPCOMPOSER_INFERENCE_KEY`, `TAPCOMPOSER_RENDER_DIR` to a private runtime directory, and `ACESTEP_ORIGIN=http://127.0.0.1:8001`. Run `uvicorn gateway:app --host 127.0.0.1 --port 8789` from this folder. Bind the tunnel to the gateway only.
+Run `.venv/bin/acestep-api`. Install the pinned gateway requirements in a separate Python 3.11 virtual environment. Set a cryptographically random `TAPCOMPOSER_INFERENCE_KEY`, `TAPCOMPOSER_RENDER_DIR` to a private runtime directory, and `ACESTEP_ORIGIN=http://127.0.0.1:8001`. Run `uvicorn gateway:app --host 127.0.0.1 --port 8789` from this folder.
 
-The running demo has systemd user units `tapcomposer-ace`, `tapcomposer-gateway`, and `tapcomposer-tunnel`. Credentials are in a mode-600 environment file outside the repository. They are not part of the model or source downloads.
+The running demo has systemd user units `tapcomposer-ace` and `tapcomposer-gateway`. Credentials are in a mode-600 environment file outside the repository. They are not part of the model or source downloads.
 
-Hosted runtime bindings:
+Local `.env.local` settings for the Node app:
 
 - `TAPCOMPOSER_PREMIUM_DEMO=true`
-- `TAPCOMPOSER_INFERENCE_URL`: HTTPS gateway origin
+- `TAPCOMPOSER_INFERENCE_URL`: `http://127.0.0.1:8789`
 - `TAPCOMPOSER_INFERENCE_KEY`: secret bearer credential
 
-Use ignored `.dev.vars` for local Worker bindings. Set production values through Sites environment tools, then deploy a saved version. Never place secrets in client variables or hosting.json.
+The app loads ignored `.env.local` when running `npm run dev` or `npm start`. The key must match the local gateway environment file. Never place it in client variables. The former tunnel is disabled and its gateway credential has been rotated. No deployment is part of this workflow.
 
 ## Limits and recovery
 
