@@ -206,3 +206,92 @@ void test('piano accepts tap input, previews interpreted chords, then keeps the 
     cleanup();
   }
 });
+
+void test('premium renders the arrangement, collects its take, and free mode makes no uploads', async () => {
+  const { PremiumStudio } = await import('../components/premium-studio');
+  Object.defineProperty(globalThis, 'localStorage', {
+    value: dom.window.localStorage,
+    configurable: true,
+  });
+  localStorage.clear();
+  const oldFetch = globalThis.fetch;
+  const calls: string[] = [];
+  const id = '12345678-1234-1234-1234-123456789abc';
+  const job = { id, state: 'queued', createdAt: Date.now(), duration: 55 };
+  globalThis.fetch = async (input, init) => {
+    const path =
+      typeof input === 'string'
+        ? input
+        : input instanceof URL
+          ? input.href
+          : input.url;
+    calls.push(path);
+    if (path.endsWith('/status'))
+      return Response.json({ premium: true, ready: true });
+    if (path.endsWith('/render')) {
+      assert.ok(init?.body instanceof Blob);
+      assert.ok(new Headers(init.headers).get('X-TapComposer-Arrangement'));
+      return Response.json(job);
+    }
+    if (path.endsWith('/audio'))
+      return new Response(
+        new Blob(['RIFF0000WAVEaudio'], { type: 'audio/wav' }),
+      );
+    return Response.json({ ...job, state: 'ready' });
+  };
+  const engine = new AudioEngine();
+  engine.exportWav = async () =>
+    new Blob(['arranged audio'], { type: 'audio/wav' });
+  const song = sample();
+  let kept = 0;
+  try {
+    render(
+      <PremiumStudio
+        song={song}
+        engine={engine}
+        onKeep={() => {
+          kept++;
+        }}
+        onBeforePlay={() => {}}
+        originalPlaying={false}
+      />,
+    );
+    await waitFor(() =>
+      assert.equal(
+        (
+          screen.getByRole('button', {
+            name: 'Make a studio take',
+          }) as HTMLButtonElement
+        ).disabled,
+        false,
+      ),
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Make a studio take' }));
+    await waitFor(() => assert.equal(kept, 1));
+    assert.equal(calls.filter((path) => path.endsWith('/render')).length, 1);
+    cleanup();
+    calls.length = 0;
+    localStorage.setItem('tapcomposer-service', 'free');
+    render(
+      <PremiumStudio
+        song={song}
+        engine={engine}
+        onKeep={() => {}}
+        onBeforePlay={() => {}}
+        originalPlaying={false}
+      />,
+    );
+    await waitFor(() =>
+      assert.ok(screen.getByText('Your studio. On your device.')),
+    );
+    assert.equal(
+      screen.queryByRole('button', { name: 'Make a studio take' }),
+      null,
+    );
+    assert.equal(calls.filter((path) => path.endsWith('/render')).length, 0);
+  } finally {
+    cleanup();
+    globalThis.fetch = oldFetch;
+    localStorage.clear();
+  }
+});

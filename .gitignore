@@ -42,3 +42,6 @@ next-env.d.ts
 
 # Copied from the pinned ONNX Runtime dependency during dev/build
 /public/inference/
+
+.dev.vars*
+**/__pycache__/

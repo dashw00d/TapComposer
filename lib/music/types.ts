@@ -69,7 +69,15 @@ export interface ComposeSettings {
   energy: number;
   variation: number;
 }
+export interface PremiumTake {
+  id: string;
+  createdAt: number;
+  fingerprint: string;
+  audio: Blob;
+  duration: number;
+}
 export interface Song {
+  premiumTakes?: PremiumTake[];
   version: 1;
   id: string;
   name: string;

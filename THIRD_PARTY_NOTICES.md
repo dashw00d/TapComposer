@@ -40,3 +40,7 @@ MIT license copies: `public/licenses/CREPE-LICENSE.txt` (Jong Wook Kim), `TORCHC
 [ONNX Runtime](https://github.com/microsoft/onnxruntime) by Microsoft is MIT licensed. The pinned 1.29.0 WASM runtime/loader are copied unmodified from the npm dependency during development/build. License: `public/licenses/ONNX-RUNTIME-LICENSE.txt`.
 
 Basic Pitch and CREPE Small were evaluated locally but are not distributed in the app. Benchmark downloads preserve their respective Apache-2.0 and MIT attribution through the source links in MODEL_EVALUATION.md.
+
+## Premium performance generation
+
+ACE-Step 1.5 source and the ACE-Step XL turbo checkpoint are supplied by the ACE-Step team under their published MIT licenses: https://github.com/ace-step/ACE-Step-1.5 and https://huggingface.co/ACE-Step/acestep-v15-xl-turbo. The service uses the VAE and Qwen3 embedding dependencies from the official model package. Models run on the separate inference host; they are not bundled into the website. See inference/README.md for versions and setup.

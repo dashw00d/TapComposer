@@ -26,36 +26,38 @@ Microphone capture requires HTTPS or localhost and browser permission. Headphone
 6. Change any idea's instrument without recording again. Preview, rename, duplicate, smooth, replace or remove parts. Balance exposes level, pan, mute, solo and overall volume.
 7. Play the song or its ingredients, seek to a section or position, repeat and adjust song speed. Save the full arrangement as stereo WAV, 192 kbps MP3, or MIDI. Download a project backup to move an editable song, including original audio, to another browser.
 
+8. In Premium, give the song a studio finish. Add optional direction, choose how closely it follows the arrangement, then make a take. Listen, compare, save WAV, or keep arranging and render again. Up to three takes survive browser saves and editable project backups. Free mode keeps all local tools and makes no audio uploads.
+
 The app supports 24 parts, 30 seconds per take, 12 sections and at most 512 beats of arrangement. These are resource limits rather than setup choices. Songs autosave locally; undo/redo retains up to 50 edits. Existing two-instrument songs retain their patterns and recordings and can be expanded with **Build my song**.
 
 Keyboard: Space plays/stops when focus is outside an interactive control; Ctrl/Command Z undoes; Shift Ctrl/Command Z redoes; Ctrl/Command S downloads a project backup; Escape stops playback. Dialogs, sliders and recording controls support keyboard interaction.
 
 ## Architecture
 
-Music processing runs in the browser. The hosted Worker serves the app and bundled assets; there are no recording upload endpoints, analytics, cloud inference calls, or application accounts.
+Free mode runs music processing on the device. Premium adds ACE-Step XL cover rendering through a server-authenticated inference gateway. The private demo includes Premium; account billing is not implemented. See [inference/README.md](./inference/README.md) for the GPU service, configuration, limits and operational requirements.
 
-| Module | Responsibility |
-| --- | --- |
-| `public/worklets/capture.js` | Audio-clock capture, meter, explicit start, 30-second cap; no microphone monitoring |
-| `lib/music/capture.ts` | Permission, cancellation, original WAV preservation, analysis worker |
-| `lib/music/neural.ts` | CREPE Tiny inference, voice resampling, confidence filtering and melodic segmentation |
-| `lib/music/analysis-client.ts` | Warm worker reuse, progress, cancellation and bounded fallback |
-| `lib/music/analyze.ts` | YIN fallback, shared note segmentation and adaptive tap onset detection |
-| `lib/music/resolve.ts` | Pulse/key estimates, soft correction and instrument-specific interpretation |
-| `lib/music/harmony.ts` | Melody-weighted diatonic harmony |
-| `lib/music/composition.ts` | Backing, feel/variation, section structure, tempo scaling and shared arranged event stream |
-| `lib/music/audio.ts` | Samples, drum/synth DSP, audio-clock scheduling, stereo mix, effects and offline rendering |
-| `lib/music/export.worker.ts` | MP3 encoding away from the interface thread |
-| `lib/music/project.ts`, `midi.ts` | Validated editable project backup/import and portable MIDI |
-| `lib/music/storage.ts` | IndexedDB songs/original audio and migration of source tempo |
-| `hooks/use-song-history.ts` | Snapshot undo/redo retaining original audio by reference |
-| `components/recorder.tsx` | Capture and take review |
-| `components/composition-panel.tsx` | Automatic composition, optional section arrangement and balance |
-| `components/composer.tsx` | Studio, transport, library, instrument changes and export |
+| Module                             | Responsibility                                                                             |
+| ---------------------------------- | ------------------------------------------------------------------------------------------ |
+| `public/worklets/capture.js`       | Audio-clock capture, meter, explicit start, 30-second cap; no microphone monitoring        |
+| `lib/music/capture.ts`             | Permission, cancellation, original WAV preservation, analysis worker                       |
+| `lib/music/neural.ts`              | CREPE Tiny inference, voice resampling, confidence filtering and melodic segmentation      |
+| `lib/music/analysis-client.ts`     | Warm worker reuse, progress, cancellation and bounded fallback                             |
+| `lib/music/analyze.ts`             | YIN fallback, shared note segmentation and adaptive tap onset detection                    |
+| `lib/music/resolve.ts`             | Pulse/key estimates, soft correction and instrument-specific interpretation                |
+| `lib/music/harmony.ts`             | Melody-weighted diatonic harmony                                                           |
+| `lib/music/composition.ts`         | Backing, feel/variation, section structure, tempo scaling and shared arranged event stream |
+| `lib/music/audio.ts`               | Samples, drum/synth DSP, audio-clock scheduling, stereo mix, effects and offline rendering |
+| `lib/music/export.worker.ts`       | MP3 encoding away from the interface thread                                                |
+| `lib/music/project.ts`, `midi.ts`  | Validated editable project backup/import and portable MIDI                                 |
+| `lib/music/storage.ts`             | IndexedDB songs/original audio and migration of source tempo                               |
+| `hooks/use-song-history.ts`        | Snapshot undo/redo retaining original audio by reference                                   |
+| `components/recorder.tsx`          | Capture and take review                                                                    |
+| `components/composition-panel.tsx` | Automatic composition, optional section arrangement and balance                            |
+| `components/composer.tsx`          | Studio, transport, library, instrument changes and export                                  |
 
 The `MusicalIntent` layer separates human input from instrument performance. Tempo changes scale playback without rewriting source timing. Playback, WAV/MP3 and MIDI use the same arrangement, section membership and mix choices. Regeneration replaces suggested backing while retaining original ideas and manual structure.
 
-Humming uses a pretrained CREPE Tiny neural pitch tracker, executed locally by ONNX Runtime Web in the analysis worker. The model and runtime load when the humming recorder opens and remain warm between takes. Confidence and silence gates filter predictions before shared note segmentation. Model loading, unsupported devices and slow inference fall back to YIN; capture and cancellation remain available. Tapping continues to use onset detection. The composer uses local chord scoring and instrument rules; no trained composer or generative cloud render is included. See [MODEL_EVALUATION.md](./MODEL_EVALUATION.md) for the evaluated alternatives and limitations.
+Humming uses a pretrained CREPE Tiny neural pitch tracker, executed locally by ONNX Runtime Web in the analysis worker. The model and runtime load when the humming recorder opens and remain warm between takes. Confidence and silence gates filter predictions before shared note segmentation. Model loading, unsupported devices and slow inference fall back to YIN; capture and cancellation remain available. Tapping continues to use onset detection. The immediate composer uses local chord scoring and instrument rules. Premium then renders the actual arrangement with ACE-Step XL, preserving tempo/key conditioning and editable source parts. See [MODEL_EVALUATION.md](./MODEL_EVALUATION.md) for the evaluated alternatives and limitations.
 
 The 1.96 MB CREPE model is bundled under `public/models`; the pinned 14 MB WASM runtime and loader are copied locally by `predev`/`prebuild`. No model or recording request goes to Hugging Face at runtime. `node scripts/download-models.mjs` restores missing weights and verifies their SHA-256 checksum.
 

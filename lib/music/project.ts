@@ -1,23 +1,39 @@
-import type { Song, Track, Instrument } from './types';
+import type { Song, Track, Instrument, PremiumTake } from './types';
 import { INSTRUMENTS } from './instruments';
 export async function exportProject(song: Song): Promise<Blob> {
   const tracks = await Promise.all(
     song.tracks.map(async (track) => {
       let original: string | null = null;
       if (track.original) {
-        const bytes = new Uint8Array(await track.original.arrayBuffer());
-        let text = '';
-        for (let i = 0; i < bytes.length; i += 8192)
-          text += String.fromCharCode(...bytes.subarray(i, i + 8192));
-        original = btoa(text);
+        original = await encodeAudio(track.original);
       }
       return { ...track, original };
     }),
   );
+  const premiumTakes = await Promise.all(
+    (song.premiumTakes ?? []).map(async (take) => ({
+      ...take,
+      audio: await encodeAudio(take.audio),
+    })),
+  );
   return new Blob(
-    [JSON.stringify({ ...song, format: 'tapcomposer-project', tracks })],
+    [
+      JSON.stringify({
+        ...song,
+        premiumTakes,
+        format: 'tapcomposer-project',
+        tracks,
+      }),
+    ],
     { type: 'application/json' },
   );
+}
+async function encodeAudio(blob: Blob) {
+  const bytes = new Uint8Array(await blob.arrayBuffer());
+  let text = '';
+  for (let i = 0; i < bytes.length; i += 8192)
+    text += String.fromCharCode(...bytes.subarray(i, i + 8192));
+  return btoa(text);
 }
 function object(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null;
@@ -31,9 +47,9 @@ function number(value: unknown, min: number, max: number) {
   );
 }
 export async function importProject(file: Blob): Promise<Song> {
-  if (file.size > 100 * 1024 * 1024)
+  if (file.size > 150 * 1024 * 1024)
     throw new Error(
-      'That project is too large. Choose a TapComposer project under 100 MB.',
+      'That project is too large. Choose a TapComposer project under 150 MB.',
     );
   const data: unknown = JSON.parse(await file.text());
   if (
@@ -178,12 +194,45 @@ export async function importProject(file: Blob): Promise<Song> {
       !number(data.compose.variation, 0, 1000000))
   )
     throw new Error('This project has invalid composition settings.');
+  if (
+    data.premiumTakes !== undefined &&
+    (!Array.isArray(data.premiumTakes) || data.premiumTakes.length > 3)
+  )
+    throw new Error('This project has invalid studio takes.');
+  const premiumTakes: PremiumTake[] = (
+    (data.premiumTakes as unknown[]) ?? []
+  ).map((raw) => {
+    if (
+      !object(raw) ||
+      typeof raw.id !== 'string' ||
+      typeof raw.fingerprint !== 'string' ||
+      !number(raw.createdAt, 0, 1e15) ||
+      !number(raw.duration, 10, 181) ||
+      typeof raw.audio !== 'string' ||
+      raw.audio.length > 48 * 1024 * 1024
+    )
+      throw new Error('This project has an invalid studio take.');
+    const bytes = Uint8Array.from(atob(raw.audio), (c) => c.charCodeAt(0));
+    if (
+      String.fromCharCode(...bytes.slice(0, 4)) !== 'RIFF' ||
+      String.fromCharCode(...bytes.slice(8, 12)) !== 'WAVE'
+    )
+      throw new Error('This studio take is not a WAV recording.');
+    return {
+      id: raw.id,
+      fingerprint: raw.fingerprint,
+      createdAt: raw.createdAt as number,
+      duration: raw.duration as number,
+      audio: new Blob([bytes], { type: 'audio/wav' }),
+    };
+  });
   const parsed = data as unknown as Song;
   return {
     ...parsed,
     id: crypto.randomUUID(),
     name: data.name.slice(0, 60),
     tracks,
+    premiumTakes,
     repeat: parsed.repeat === true,
     masterVolume: number(parsed.masterVolume, 0, 1)
       ? parsed.masterVolume

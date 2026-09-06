@@ -54,7 +54,6 @@ import { CompositionPanel, MixControls } from './composition-panel';
 import { useSongHistory } from '@/hooks/use-song-history';
 import { INSTRUMENTS, instrumentInfo } from '@/lib/music/instruments';
 import {
-  composeSong,
   arrangedTracks,
   patternTracks,
   changeInstrument,
@@ -65,13 +64,10 @@ import { exportMidi } from '@/lib/music/midi';
 import { Switch } from '@/components/ui/switch';
 import { AudioEngine } from '@/lib/music/audio';
 import { microphoneError } from '@/lib/music/capture';
-import { buildIntent } from '@/lib/music/analyze';
-import {
-  inferContext,
-  resolveIntent,
-  smoothTrack,
-  songDuration,
-} from '@/lib/music/resolve';
+import { makeDemoSong } from '@/lib/music/demo';
+import { PremiumStudio } from './premium-studio';
+import { songFingerprint } from '@/lib/premium/client';
+import { smoothTrack, songDuration } from '@/lib/music/resolve';
 import {
   download,
   listSongs,
@@ -114,6 +110,7 @@ export default function Composer() {
   const playback = useRef<{ startAt: number; duration: number } | null>(null);
   const saves = useRef<Promise<void>>(Promise.resolve());
   const currentSongId = useRef('');
+  const latestSong = useRef<Song | null>(null);
   const mounted = useRef(true);
   const exportWorker = useRef<Worker | null>(null);
   const playSerial = useRef(0);
@@ -145,6 +142,7 @@ export default function Composer() {
   useEffect(() => {
     if (!song) return;
     currentSongId.current = song.id;
+    latestSong.current = song;
     const snapshot = song;
     saves.current = saves.current
       .catch(() => {})
@@ -337,53 +335,44 @@ export default function Composer() {
       if (mounted.current) setExporting(false);
     }
   }
-  function demo() {
+  async function demo() {
     if (!song || song.tracks.length) return;
-    const intent = buildIntent(
-      'hum',
-      [60, 64, 67, 64, 62, 60].map((pitch, i) => ({
-        pitch,
-        time: i * 0.48,
-        duration: i === 5 ? 0.85 : 0.36,
-        confidence: 1,
-        intensity: i === 0 ? 0.85 : 0.65,
-      })),
-      4.8,
-    );
-    const context = inferContext(intent);
-    const piano: Track = {
-      id: crypto.randomUUID(),
-      instrument: 'piano',
-      name: 'Piano example',
-      intent,
-      ...resolveIntent(intent, 'piano', context),
-      original: null,
-      muted: false,
-      smoother: false,
-    };
-    const taps = buildIntent(
-      'touch',
-      Array.from({ length: 8 }, (_, i) => ({
-        pitch: null,
-        time: i * 0.48,
-        duration: 0.1,
-        confidence: 1,
-        intensity: i % 2 === 0 ? 0.9 : 0.6,
-      })),
-      4.8,
-    );
-    const drums: Track = {
-      id: crypto.randomUUID(),
-      instrument: 'drums',
-      name: 'Drums example',
-      intent: taps,
-      ...resolveIntent(taps, 'drums', context),
-      original: null,
-      muted: false,
-      smoother: false,
-    };
-    const composed = composeSong({ ...song, context, tracks: [piano, drums] });
+    const composed = makeDemoSong(song);
     updateSong(() => composed);
+    let premium = true;
+    try {
+      premium = localStorage.getItem('tapcomposer-service') !== 'free';
+    } catch {}
+    if (premium) {
+      try {
+        const response = await fetch('/demo/studio-example.wav');
+        if (
+          response.ok &&
+          response.headers.get('Content-Type')?.includes('audio/')
+        ) {
+          const audio = await response.blob();
+          // The example is a real ACE-Step rendering of this exact musical arrangement.
+          if (mounted.current && currentSongId.current === composed.id) {
+            const latest = latestSong.current ?? composed;
+            updateSong(() => ({
+              ...latest,
+              premiumTakes: [
+                {
+                  id: 'premium-example',
+                  createdAt: Date.now(),
+                  duration: songDuration(arrangedTracks(composed)) + 0.7,
+                  fingerprint: songFingerprint(composed),
+                  audio,
+                },
+              ],
+            }));
+          }
+          return;
+        }
+      } catch {
+        /* The editable example remains usable without the service or asset. */
+      }
+    }
     void play(arrangedTracks(composed), 'all');
   }
   const tracks = song?.tracks ?? [],
@@ -669,6 +658,21 @@ export default function Composer() {
                 void play(arrangedTracks(song), 'all', seconds, true)
               }
               position={position}
+            />
+          )}
+          {song && (
+            <PremiumStudio
+              key={song.id}
+              song={song}
+              engine={audioEngine}
+              onBeforePlay={stop}
+              originalPlaying={!!playing}
+              onKeep={(take) =>
+                updateSong((s) => ({
+                  ...s,
+                  premiumTakes: [take, ...(s.premiumTakes ?? [])].slice(0, 3),
+                }))
+              }
             />
           )}
           {song && mixOpen && <MixControls song={song} update={updateMusic} />}
@@ -1132,9 +1136,11 @@ export default function Composer() {
           <div className="credits-text">
             <p>
               Recording, melody detection, playback, and export happen in your
-              browser. Your songs and original recordings are stored here,
-              without being sent to a server. Clearing your browser’s data
-              removes them. Download anything you want to keep.
+              browser. Your songs and original recordings are stored here, on
+              your device. Premium rendering sends the arranged audio and style
+              direction to our inference service when you choose “Make a studio
+              take.” Original microphone recordings stay here. Clearing your
+              browser’s data removes them. Download anything you want to keep.
             </p>
             <p>
               Humming recognition uses{' '}
