@@ -38,7 +38,9 @@ Music processing runs in the browser. The hosted Worker serves the app and bundl
 | --- | --- |
 | `public/worklets/capture.js` | Audio-clock capture, meter, explicit start, 30-second cap; no microphone monitoring |
 | `lib/music/capture.ts` | Permission, cancellation, original WAV preservation, analysis worker |
-| `lib/music/analyze.ts` | YIN pitch tracking, note segmentation and adaptive tap onset detection |
+| `lib/music/neural.ts` | CREPE Tiny inference, voice resampling, confidence filtering and melodic segmentation |
+| `lib/music/analysis-client.ts` | Warm worker reuse, progress, cancellation and bounded fallback |
+| `lib/music/analyze.ts` | YIN fallback, shared note segmentation and adaptive tap onset detection |
 | `lib/music/resolve.ts` | Pulse/key estimates, soft correction and instrument-specific interpretation |
 | `lib/music/harmony.ts` | Melody-weighted diatonic harmony |
 | `lib/music/composition.ts` | Backing, feel/variation, section structure, tempo scaling and shared arranged event stream |
@@ -53,13 +55,15 @@ Music processing runs in the browser. The hosted Worker serves the app and bundl
 
 The `MusicalIntent` layer separates human input from instrument performance. Tempo changes scale playback without rewriting source timing. Playback, WAV/MP3 and MIDI use the same arrangement, section membership and mix choices. Regeneration replaces suggested backing while retaining original ideas and manual structure.
 
-The initial music brain uses local DSP, chord scoring and instrument rules, following the plan's rules-before-training approach. There is no neural transcription, trained composer or generative cloud render. Those remain optional future enhancements; the tap/hum-to-song flow already works without them.
+Humming uses a pretrained CREPE Tiny neural pitch tracker, executed locally by ONNX Runtime Web in the analysis worker. The model and runtime load when the humming recorder opens and remain warm between takes. Confidence and silence gates filter predictions before shared note segmentation. Model loading, unsupported devices and slow inference fall back to YIN; capture and cancellation remain available. Tapping continues to use onset detection. The composer uses local chord scoring and instrument rules; no trained composer or generative cloud render is included. See [MODEL_EVALUATION.md](./MODEL_EVALUATION.md) for the evaluated alternatives and limitations.
+
+The 1.96 MB CREPE model is bundled under `public/models`; the pinned 14 MB WASM runtime and loader are copied locally by `predev`/`prebuild`. No model or recording request goes to Hugging Face at runtime. `node scripts/download-models.mjs` restores missing weights and verifies their SHA-256 checksum.
 
 Four sample banks are bundled locally: grand piano, electric bass, acoustic guitar and violin-based strings, about 3.3 MB in total. Drums and synth are generated. No third-party sound CDN is required during playback. Assets must load first; an installable, offline-cached PWA is not included.
 
 ## Verification and practical limits
 
-`npm run check` runs strict TypeScript, application lint, and automated engine, persistence, audio and component interaction tests. Coverage includes pitch/noise/tap fixtures, all instrument/input combinations, automatic structure and variations, preservation of manual edits, tempo scaling, entrances/repeat/register, seek/repeat scheduling, backup import validation, MIDI, undo, original-audio persistence, sample decoding, bounded stereo rendering and WAV/MP3 decoding. Component interaction tests exercise arranging and the tap-to-piano keep flow in jsdom. Production output is built and checked through HTTP requests.
+`npm run check` runs strict TypeScript, application lint, and 40 automated engine, persistence, audio and component interaction tests. Coverage includes pitch/noise/tap fixtures, all instrument/input combinations, automatic structure and variations, preservation of manual edits, tempo scaling, entrances/repeat/register, seek/repeat scheduling, backup import validation, MIDI, undo, original-audio persistence, sample decoding, bounded stereo rendering and WAV/MP3 decoding. Component interaction tests exercise arranging and the tap-to-piano keep flow in jsdom. Production output is built and checked through HTTP requests.
 
 The untouched generated Shadcn catalog and its generated mobile hook are excluded from application lint because of upstream lint violations. They remain typechecked; application code and tests are linted.
 

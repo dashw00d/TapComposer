@@ -26,6 +26,7 @@ import {
   type CaptureSession,
 } from '@/lib/music/capture';
 import { buildIntent } from '@/lib/music/analyze';
+import { prepareUnderstanding } from '@/lib/music/analysis-client';
 import { inferContext, resolveIntent, smoothTrack } from '@/lib/music/resolve';
 import type {
   Instrument,
@@ -65,6 +66,7 @@ export function Recorder({
   const [elapsed, setElapsed] = useState(0);
   const [level, setLevel] = useState(0);
   const [count, setCount] = useState(0);
+  const [analysisProgress, setAnalysisProgress] = useState(0);
   const [draft, setDraft] = useState<Track | null>(null);
   const [playing, setPlaying] = useState(false);
   const session = useRef<CaptureSession | null>(null);
@@ -82,6 +84,9 @@ export function Recorder({
     tracks: song.tracks.filter((t) => t.id !== replaceId),
   });
   const label = instrumentInfo(instrument).name;
+  useEffect(() => {
+    if (mode === 'hum') prepareUnderstanding();
+  }, [mode]);
   const transition = (next: typeof phase) => {
     phaseRef.current = next;
     setPhase(next);
@@ -173,12 +178,16 @@ export function Recorder({
     engine.stop();
     setLevel(0);
     transition('analyzing');
+    setAnalysisProgress(0);
     const token = serial.current;
     try {
       const task = understandRecording(
         pcm,
         rate,
         mode === 'hum' ? 'hum' : 'microphone-taps',
+        (progress) => {
+          if (active.current) setAnalysisProgress(progress);
+        },
       );
       analysisCancel.current = task.cancel;
       const intent = await task.result;
@@ -522,7 +531,9 @@ export function Recorder({
                 {phase === 'recording'
                   ? `${Math.min(30, elapsed).toFixed(1)} / 30 seconds`
                   : phase === 'analyzing'
-                    ? 'Turning your idea into a part…'
+                    ? analysisProgress > 0
+                      ? `Finding your notes… ${Math.round(analysisProgress * 100)}%`
+                      : 'Turning your idea into a part…'
                     : 'Up to 30 seconds. Keep it simple.'}
               </p>
             </div>

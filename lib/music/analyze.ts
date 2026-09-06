@@ -83,6 +83,20 @@ export function analyzeHum(
       rms: detected?.rms ?? 0,
     });
   }
+  return humFramesToIntent(frames, hop / rate, input.length / sampleRate);
+}
+
+export interface PitchFrame {
+  time: number;
+  pitch: number;
+  confidence: number;
+  rms: number;
+}
+export function humFramesToIntent(
+  frames: PitchFrame[],
+  hopSeconds: number,
+  duration: number,
+): MusicalIntent {
   const smoothed = frames.map((f, i) => {
     const neighbors = frames
       .slice(Math.max(0, i - 2), i + 3)
@@ -104,7 +118,10 @@ export function analyzeHum(
     ) {
       events.push({
         time: group[0].time,
-        duration: group[group.length - 1].time - group[0].time + hop / rate,
+        duration: Math.min(
+          duration - group[0].time,
+          group[group.length - 1].time - group[0].time + hopSeconds,
+        ),
         pitch: median(group.map((x) => x.pitch)),
         confidence: group.reduce((s, x) => s + x.confidence, 0) / group.length,
         intensity: clamp(
@@ -131,7 +148,7 @@ export function analyzeHum(
     group.push(f);
   }
   flush();
-  return buildIntent('hum', events, input.length / sampleRate);
+  return buildIntent('hum', events, duration);
 }
 
 export function analyzeTaps(

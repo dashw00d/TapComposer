@@ -39,3 +39,6 @@ next-env.d.ts
 
 # TypeScript incremental cache
 *.tsbuildinfo
+
+# Copied from the pinned ONNX Runtime dependency during dev/build
+/public/inference/

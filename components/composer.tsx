@@ -1137,6 +1137,19 @@ export default function Composer() {
               removes them. Download anything you want to keep.
             </p>
             <p>
+              Humming recognition uses{' '}
+              <a
+                href="https://github.com/marl/crepe"
+                target="_blank"
+                rel="noreferrer"
+              >
+                CREPE
+              </a>{' '}
+              by Jong Wook Kim and collaborators, via torchcrepe and onnxcrepe
+              (MIT). It runs here on your device, with a quick detector as
+              backup.
+            </p>
+            <p>
               Piano: Salamander Grand Piano by Alexander Holm, shared under{' '}
               <a
                 href="https://creativecommons.org/licenses/by/3.0/"

@@ -14,11 +14,11 @@ Acceptance requirements (completion must be supported by working implementation 
 - [x] Quality of life: undo/redo, keyboard shortcuts, safe autosave, project backup/import, original input preservation, clear empty/error states, touch/keyboard access.
 - [x] MP3/WAV full-song exports and portable MIDI export.
 - [x] Existing saved songs migrate without losing original recordings or user patterns.
-- [x] Production build, HTTP runtime verification and 35 automated engine/data/audio/component interaction checks.
+- [x] Production build, HTTP runtime verification and 40 automated engine/data/audio/component interaction checks.
 
 Implemented scope: six input-independent instruments, source-preserving automatic song composition, optional section arrangement, transport, mix, project portability and audio exports. The earlier two-instrument MVP is not the completion criterion.
 
-Verification: strict TypeScript and application lint; automated audio/DSP, data, composition and jsdom interaction checks; production build and HTTP runtime smoke. Real microphone/device and subjective listening evaluation are not claimed by these tests. Local rules and harmony scoring power the instant arranger; neural transcription and the optional heavy generative render remain future enhancements from the plan.
+Verification: strict TypeScript and application lint; automated audio/DSP, data, composition and jsdom interaction checks; production build and HTTP runtime smoke. Real microphone/device and subjective listening evaluation are not claimed by these tests. Local rules and harmony scoring power the instant arranger; CREPE Tiny now provides neural humming recognition, with a YIN fallback. The optional heavy generative render remains a future enhancement from the plan.
 
 Release workflow: push the exact source, save its validated build as a Sites version, then publish to the existing owner-only site. Sites records the source commit, saved version and deployment outcome; publication is verified separately from implementation checks.
 

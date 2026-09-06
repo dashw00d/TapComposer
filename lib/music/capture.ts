@@ -1,6 +1,7 @@
 import type { AudioEngine } from './audio';
 import type { MusicalIntent } from './types';
 import { encodeWav } from './wav';
+import { analyzeRecording } from './analysis-client';
 
 export interface CaptureSession {
   stop: () => void;
@@ -74,43 +75,10 @@ export function understandRecording(
   pcm: Float32Array,
   sampleRate: number,
   source: 'hum' | 'microphone-taps',
+  onProgress?: (value: number) => void,
 ): { original: Blob; result: Promise<MusicalIntent>; cancel: () => void } {
   const original = encodeWav([pcm], sampleRate);
-  const worker = new Worker(new URL('./analyze.worker.ts', import.meta.url), {
-    type: 'module',
-  });
-  let rejectTask: (reason: Error) => void = () => {};
-  let timeout: ReturnType<typeof setTimeout>;
-  const result = new Promise<MusicalIntent>((resolve, reject) => {
-    rejectTask = reject;
-    timeout = setTimeout(() => {
-      worker.terminate();
-      reject(new Error('That took too long. Try a shorter recording.'));
-    }, 20000);
-    worker.onmessage = (e) => {
-      clearTimeout(timeout);
-      worker.terminate();
-      if (e.data.error) reject(new Error(e.data.error));
-      else resolve(e.data.intent);
-    };
-    worker.onerror = () => {
-      clearTimeout(timeout);
-      worker.terminate();
-      reject(
-        new Error('That recording could not be understood. Please try again.'),
-      );
-    };
-    worker.postMessage({ pcm, sampleRate, source }, [pcm.buffer]);
-  });
-  return {
-    original,
-    result,
-    cancel: () => {
-      clearTimeout(timeout);
-      worker.terminate();
-      rejectTask(new Error('Cancelled'));
-    },
-  };
+  return { original, ...analyzeRecording(pcm, sampleRate, source, onProgress) };
 }
 export function microphoneError(error: unknown) {
   if (error instanceof DOMException) {

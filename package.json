@@ -13,7 +13,9 @@
     "format": "oxfmt",
     "test": "tsx --test tests/*.test.ts tests/*.test.tsx",
     "typecheck": "tsc --noEmit",
-    "check": "npm run typecheck && npm run lint && npm test"
+    "check": "npm run typecheck && npm run lint && npm test",
+    "predev": "node scripts/prepare-inference.mjs",
+    "prebuild": "node scripts/prepare-inference.mjs"
   },
   "dependencies": {
     "@base-ui/react": "1.7.0",
@@ -26,6 +28,7 @@
     "embla-carousel-react": "8.5.2",
     "input-otp": "1.4.2",
     "lucide-react": "1.31.0",
+    "onnxruntime-web": "^1.29.0",
     "react": "^19.2.8",
     "react-day-picker": "9.8.1",
     "react-dom": "^19.2.8",
