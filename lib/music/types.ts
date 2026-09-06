@@ -29,12 +29,15 @@ export interface SongContext {
   chords?: number[][];
 }
 export interface PerformanceEvent {
+  expression?: { time: number; gain: number }[];
   time: number;
   duration: number;
   note: number;
   velocity: number;
 }
 export interface Track {
+  pinned?: boolean;
+  edited?: boolean;
   id: string;
   instrument: Instrument;
   name: string;
@@ -55,8 +58,11 @@ export interface SectionPart {
   offsetBeats: number;
   repeat: boolean;
   transpose: number;
+  fadeInBeats?: number;
+  fadeOutBeats?: number;
 }
 export interface SongSection {
+  pinned?: boolean;
   id: string;
   name: string;
   bars: number;
@@ -77,6 +83,9 @@ export interface PremiumTake {
   duration: number;
 }
 export interface Song {
+  harmonyPinned?: boolean;
+  familyId?: string;
+  branchedFrom?: string;
   premiumTakes?: PremiumTake[];
   version: 1;
   id: string;

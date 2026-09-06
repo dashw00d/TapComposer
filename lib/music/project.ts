@@ -113,6 +113,19 @@ export async function importProject(file: Blob): Promise<Song> {
         !number(event.velocity, 0, 1)
       )
         throw new Error('This project contains invalid music events.');
+      if (
+        event.expression !== undefined &&
+        (!Array.isArray(event.expression) ||
+          event.expression.length > 16 ||
+          !event.expression.every(
+            (p, i, points) =>
+              object(p) &&
+              number(p.time, 0, 120) &&
+              number(p.gain, 0, 1) &&
+              (i === 0 || (p.time as number) > points[i - 1].time),
+          ))
+      )
+        throw new Error('This project contains invalid expression.');
     }
     for (const event of raw.intent.events) {
       if (
@@ -141,6 +154,8 @@ export async function importProject(file: Blob): Promise<Song> {
       solo: raw.solo === true,
       muted: raw.muted === true,
       generated: raw.generated === true,
+      pinned: raw.pinned === true,
+      edited: raw.edited === true,
     } as unknown as Track;
   });
   if (new Set(tracks.map((t) => t.id)).size !== tracks.length)
@@ -170,6 +185,7 @@ export async function importProject(file: Blob): Promise<Song> {
   )
     throw new Error('This song is too long to open safely.');
   for (const section of sections) {
+    if (section.pinned !== undefined) section.pinned = section.pinned === true;
     if (section.parts !== undefined) {
       if (
         !object(section.parts) ||
@@ -178,7 +194,11 @@ export async function importProject(file: Blob): Promise<Song> {
             object(setting) &&
             number(setting.offsetBeats, 0, 127) &&
             typeof setting.repeat === 'boolean' &&
-            number(setting.transpose, -24, 24),
+            number(setting.transpose, -24, 24) &&
+            (setting.fadeInBeats === undefined ||
+              number(setting.fadeInBeats, 0, 128)) &&
+            (setting.fadeOutBeats === undefined ||
+              number(setting.fadeOutBeats, 0, 128)),
         )
       )
         throw new Error('This project has invalid part timing.');
@@ -233,6 +253,15 @@ export async function importProject(file: Blob): Promise<Song> {
     name: data.name.slice(0, 60),
     tracks,
     premiumTakes,
+    harmonyPinned: parsed.harmonyPinned === true,
+    familyId:
+      typeof parsed.familyId === 'string'
+        ? parsed.familyId.slice(0, 100)
+        : undefined,
+    branchedFrom:
+      typeof parsed.branchedFrom === 'string'
+        ? parsed.branchedFrom.slice(0, 100)
+        : undefined,
     repeat: parsed.repeat === true,
     masterVolume: number(parsed.masterVolume, 0, 1)
       ? parsed.masterVolume

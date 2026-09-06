@@ -1541,3 +1541,204 @@ footer {
     align-items: flex-start;
   }
 }
+
+/* Extra control is revealed around the idea or section being edited. */
+.capture-first {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 22px 24px;
+  border: 1px solid #405044;
+  border-radius: 16px;
+  background: linear-gradient(115deg, #29352b, #202831);
+  margin-bottom: 12px;
+}
+.capture-first > div {
+  flex: 1;
+}
+.capture-first strong {
+  display: block;
+  font-size: 19px;
+  color: #edf3e8;
+}
+.capture-first span {
+  display: block;
+  margin-top: 5px;
+  color: #adbcae;
+  font-size: 13px;
+}
+.instrument-drawer {
+  margin-bottom: 26px;
+}
+.instrument-drawer > summary,
+.gentle-details > summary {
+  cursor: pointer;
+  color: #bac8b9;
+  font-size: 13px;
+  padding: 12px 0;
+}
+.instrument-drawer[open] > summary {
+  margin-bottom: 8px;
+}
+.gentle-details {
+  border-top: 1px solid #38424d;
+  margin-top: 12px;
+}
+.gentle-details > p,
+.part-provenance,
+.audio-comparison p {
+  color: #aeb9c5;
+  font-size: 12px;
+  line-height: 1.6;
+}
+.gentle-details > label {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 13px;
+  margin: 12px 0;
+}
+.direction-buttons,
+.sound-auditions,
+.comparison-choices {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 12px 0;
+}
+.direction-buttons .button,
+.sound-auditions .button {
+  padding: 9px 12px;
+  font-size: 12px;
+}
+.sound-auditions {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+}
+.sound-auditions [aria-pressed='true'],
+.comparison-choices [aria-pressed='true'] {
+  background: #c4f278;
+  color: #213016;
+  border-color: #c4f278;
+}
+.pin-part[aria-pressed='true'],
+.section-actions [aria-pressed='true'] {
+  color: #c4f278;
+  background: #36452b;
+  border-radius: 6px;
+}
+.pin-part {
+  flex-shrink: 0;
+}
+.journey-editor svg {
+  display: block;
+  width: 100%;
+  height: 110px;
+  border-radius: 8px;
+  background: #1c242c;
+  overflow: visible;
+  cursor: crosshair;
+  margin: 18px 0;
+}
+.journey-sliders {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(95px, 1fr));
+  gap: 20px;
+  margin: 16px 0 22px;
+}
+.journey-sliders label {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  font-size: 11px;
+  color: #b4c1ce;
+}
+.comparison-dialog {
+  max-width: min(620px, calc(100vw - 32px)) !important;
+}
+.audio-comparison {
+  margin: 12px 0;
+}
+.audio-comparison audio {
+  width: 100%;
+  margin: 8px 0;
+}
+.audio-comparison output {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: #b7c8ad;
+  padding: 28px 0;
+}
+.section-card {
+  position: relative;
+  padding-right: 7px;
+  min-width: 228px;
+}
+.section-seek[draggable] {
+  cursor: grab;
+}
+.section-seek[draggable]:active {
+  cursor: grabbing;
+}
+.section-resize {
+  position: absolute;
+  right: 0;
+  top: 0;
+  bottom: 0;
+  width: 9px;
+  cursor: col-resize;
+  touch-action: none;
+  border-radius: 0 10px 10px 0;
+}
+.section-resize:hover,
+.section-resize:focus-visible {
+  background: #c4f27855;
+  outline: 1px solid #c4f278;
+  outline-offset: -1px;
+}
+.studio-track-list .track-info {
+  min-width: 0;
+  width: 132px;
+}
+@media (max-width: 640px) {
+  .capture-first {
+    flex-wrap: wrap;
+    padding: 18px;
+    gap: 10px;
+  }
+  .capture-first > div {
+    flex-basis: 100%;
+    margin-bottom: 5px;
+  }
+  .capture-first .button {
+    flex: 1;
+    padding: 11px 8px;
+    font-size: 12px;
+  }
+  .studio-track-list .track-info {
+    flex: 1;
+    width: auto;
+  }
+  .comparison-choices .button {
+    flex: 1;
+  }
+}
+.section-fades {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 22px;
+  margin: 18px 0;
+}
+.section-fades label {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  color: #b8c5d2;
+  font-size: 12px;
+}
+.comparison-choices {
+  border: 0;
+  padding: 0;
+  min-width: 0;
+}

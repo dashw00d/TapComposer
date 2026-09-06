@@ -233,3 +233,66 @@ void test('seek starts at the requested song clock and repeat retains the full s
     engine.stop();
   }
 });
+
+void test('a held synth note audibly fades in and out in the actual audio render', async () => {
+  const previous = globalThis.OfflineAudioContext;
+  globalThis.OfflineAudioContext =
+    NativeOfflineAudioContext as unknown as typeof OfflineAudioContext;
+  try {
+    const engine = new AudioEngine();
+    const track: Track = {
+      id: 'held',
+      name: 'Held note',
+      instrument: 'synth',
+      intent: buildIntent('hum', [], 4),
+      events: [{ time: 0, duration: 4, note: 57, velocity: 0.6 }],
+      duration: 4,
+      original: null,
+      muted: false,
+      smoother: false,
+    };
+    const song = {
+      ...newSong(),
+      context: { tempo: 120, key: 0, mode: 'major' as const, confidence: 1 },
+      tracks: [track],
+      sections: [
+        {
+          id: 's',
+          name: 'Swell',
+          bars: 2,
+          energy: 1,
+          trackIds: ['held'],
+          parts: {
+            held: {
+              offsetBeats: 0,
+              repeat: false,
+              transpose: 0,
+              fadeInBeats: 4,
+              fadeOutBeats: 4,
+            },
+          },
+        },
+      ],
+    };
+    const buffer = await engine.render(arrangedTracks(song));
+    const rms = (at: number) => {
+      const samples = buffer
+        .getChannelData(0)
+        .slice(
+          Math.floor(at * buffer.sampleRate),
+          Math.floor((at + 0.1) * buffer.sampleRate),
+        );
+      return Math.sqrt(samples.reduce((n, x) => n + x * x, 0) / samples.length);
+    };
+    assert.ok(
+      rms(1.9) > rms(0.25) * 2,
+      'Held note must grow between note attacks',
+    );
+    assert.ok(
+      rms(1.9) > rms(3.75) * 2,
+      'Held note must fade before its release',
+    );
+  } finally {
+    globalThis.OfflineAudioContext = previous;
+  }
+});

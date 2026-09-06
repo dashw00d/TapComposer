@@ -6,6 +6,7 @@ import {
   Hand,
   Headphones,
   Mic,
+  Music2,
   Piano,
   Play,
   RotateCcw,
@@ -35,12 +36,19 @@ import type {
   Song,
   Track,
 } from '@/lib/music/types';
-import { patternTracks } from '@/lib/music/composition';
-import { instrumentInfo } from '@/lib/music/instruments';
+import { layerIdea } from '@/lib/music/direct';
+import { Switch } from '@/components/ui/switch';
+import { patternTracks, changeInstrument } from '@/lib/music/composition';
+import { INSTRUMENTS, instrumentInfo } from '@/lib/music/instruments';
 import { MAX_SECONDS } from '@/lib/music/types';
 
 interface Props {
   instrument: Instrument;
+  captureFirst?: boolean;
+  onKeepLayers?: (
+    tracks: Track[],
+    context: NonNullable<Song['context']>,
+  ) => void;
   song: Song;
   engine: AudioEngine;
   replaceId?: string;
@@ -48,13 +56,19 @@ interface Props {
   onKeep: (track: Track, context: NonNullable<Song['context']>) => void;
 }
 export function Recorder({
-  instrument,
+  instrument: initialInstrument,
+  captureFirst = false,
+  onKeepLayers,
   song,
   engine,
   replaceId,
   onClose,
   onKeep,
 }: Props) {
+  const [instrument, setInstrument] = useState(initialInstrument);
+  const [chosen, setChosen] = useState<Instrument[]>([initialInstrument]);
+  const [layering, setLayering] = useState(false);
+  const [inContext, setInContext] = useState(false);
   const [phase, setPhase] = useState<
     'ready' | 'requesting' | 'recording' | 'analyzing' | 'review'
   >('ready');
@@ -105,10 +119,27 @@ export function Recorder({
     };
   }, [engine]);
 
-  async function preview(track: Track) {
+  async function preview(
+    track: Track,
+    instruments = chosen,
+    together = inContext,
+  ) {
     try {
       setPlaying(true);
-      await engine.play([track], false, () => {
+      const layers = context.current
+        ? layerIdea(song, track, instruments, context.current)
+        : [track];
+      const tracks = together
+        ? patternTracks({
+            ...song,
+            context: context.current,
+            tracks: [
+              ...song.tracks.filter((t) => t.id !== replaceId),
+              ...layers,
+            ],
+          })
+        : layers;
+      await engine.play(tracks, false, () => {
         if (active.current) setPlaying(false);
       });
     } catch (e) {
@@ -289,6 +320,8 @@ export function Recorder({
       buildIntent(
         'touch',
         [...tapEvents.current],
+        // Called only when the recording finishes, never during rendering.
+        // oxlint-disable-next-line react/react-compiler
         Math.min(MAX_SECONDS, (performance.now() - tapStart.current) / 1000),
       ),
       null,
@@ -306,6 +339,8 @@ export function Recorder({
         ]);
         await engine.ready();
         if (!active.current) return;
+        // Event-time capture after the audio device is ready.
+        // oxlint-disable-next-line react/react-compiler
         tapStart.current = performance.now();
         tapEvents.current = [];
         transition('recording');
@@ -313,6 +348,8 @@ export function Recorder({
           await engine.play(backing, true, () => {});
         // The first tap defines zero; the audio's tiny scheduling lead is immaterial for human taps.
         interval.current = setInterval(() => {
+          // Recording event time, never evaluated during rendering.
+          // oxlint-disable-next-line react/react-compiler
           const time = (performance.now() - tapStart.current) / 1000;
           setElapsed(time);
           if (time >= MAX_SECONDS) finishTaps();
@@ -325,6 +362,8 @@ export function Recorder({
         return;
       }
     }
+    // Recording event time, never evaluated during rendering.
+    // oxlint-disable-next-line react/react-compiler
     const time = (performance.now() - tapStart.current) / 1000;
     const last = tapEvents.current.at(-1);
     if (last && time - last.time < 0.09) return;
@@ -367,14 +406,24 @@ export function Recorder({
           className={`dialog-instrument ${instrument}`}
           style={{ background: instrumentInfo(instrument).color }}
         >
-          {instrument === 'piano' ? <Piano /> : <Drum />}
+          {instrument === 'piano' ? (
+            <Piano />
+          ) : instrument === 'drums' ? (
+            <Drum />
+          ) : (
+            <Music2 />
+          )}
         </div>
         <DialogTitle className="dialog-title">
-          {phase === 'review' ? 'Sound like you?' : `${label}, your way.`}
+          {phase === 'review'
+            ? 'Find its voice.'
+            : captureFirst
+              ? 'Start with your idea.'
+              : `${label}, your way.`}
         </DialogTitle>
         <DialogDescription className="dialog-description">
           {phase === 'review'
-            ? 'A little idea, turned into music. Give it a listen.'
+            ? 'Same idea, different instruments. Choose a sound to hear it.'
             : mode === 'hum'
               ? 'A few notes are enough. Hum them one at a time.'
               : mode === 'touch'
@@ -567,6 +616,73 @@ export function Recorder({
         ) : (
           draft && (
             <>
+              <div
+                className="sound-auditions"
+                aria-label="Audition instruments"
+              >
+                {INSTRUMENTS.map((info) => (
+                  <button
+                    key={info.id}
+                    className="button"
+                    aria-pressed={chosen.includes(info.id)}
+                    disabled={
+                      layering &&
+                      !chosen.includes(info.id) &&
+                      chosen.length >=
+                        24 - song.tracks.filter((t) => t.id !== draft.id).length
+                    }
+                    onClick={() => {
+                      const next = layering
+                        ? chosen.includes(info.id)
+                          ? chosen.length > 1
+                            ? chosen.filter((id) => id !== info.id)
+                            : chosen
+                          : [...chosen, info.id]
+                        : [info.id];
+                      const track = changeInstrument(
+                        draft,
+                        next[0],
+                        context.current!,
+                      );
+                      setChosen(next);
+                      setInstrument(next[0]);
+                      setDraft(track);
+                      void preview(track, next);
+                    }}
+                  >
+                    {info.name}
+                  </button>
+                ))}
+              </div>
+              <details className="gentle-details">
+                <summary>Layer sounds or hear it with the song</summary>
+                <label>
+                  <Switch
+                    checked={layering}
+                    onCheckedChange={(value) => {
+                      setLayering(value);
+                      if (!value) {
+                        setChosen([instrument]);
+                        void preview(draft, [instrument]);
+                      }
+                    }}
+                  />{' '}
+                  Use more than one instrument
+                </label>
+                {!!backing.length && (
+                  <label>
+                    <Switch
+                      checked={inContext}
+                      onCheckedChange={(value) => {
+                        setInContext(value);
+                        void preview(draft, chosen, value);
+                      }}
+                    />{' '}
+                    Hear it with my song
+                  </label>
+                )}
+                <p>The same recording is kept with every sound.</p>
+              </details>
               <div className="preview-part">
                 <div className="mini-notes" aria-hidden="true">
                   {draft.events.slice(0, 40).map((e, i) => (
@@ -613,7 +729,12 @@ export function Recorder({
                 className="button primary full"
                 onClick={() => {
                   engine.stop();
-                  onKeep(draft, context.current!);
+                  if (onKeepLayers)
+                    onKeepLayers(
+                      layerIdea(song, draft, chosen, context.current!),
+                      context.current!,
+                    );
+                  else onKeep(draft, context.current!);
                 }}
               >
                 <Check size={19} /> Keep it

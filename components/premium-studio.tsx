@@ -14,6 +14,14 @@ import {
   SelectTrigger,
   SelectValue,
 } from './ui/select';
+import { AudioComparison, type ComparisonSource } from './audio-comparison';
+import { pauseOtherAudio } from '@/lib/music/media';
+import {
+  Dialog,
+  DialogContent,
+  DialogTitle,
+  DialogDescription,
+} from './ui/dialog';
 import { Slider } from './ui/slider';
 import type { AudioEngine } from '@/lib/music/audio';
 import { arrangedTracks } from '@/lib/music/composition';
@@ -22,6 +30,7 @@ import type { PremiumTake, Song } from '@/lib/music/types';
 import {
   renderMetadata,
   songFingerprint,
+  matchesSong,
   studioFetch,
   type RenderJob,
 } from '@/lib/premium/client';
@@ -44,6 +53,7 @@ export function PremiumStudio({
     premium: boolean;
     ready: boolean;
   } | null>(null);
+  const [comparison, setComparison] = useState<ComparisonSource[] | null>(null);
   const [direction, setDirection] = useState('');
   const [strength, setStrength] = useState(0.8);
   const [job, setJob] = useState<RenderJob | null>(null);
@@ -404,6 +414,28 @@ export function PremiumStudio({
               <Download size={16} /> Save WAV
             </button>
           </div>
+          <button
+            className="button"
+            disabled={!audible}
+            onClick={() => {
+              audio.current?.pause();
+              onBeforePlay();
+              setComparison([
+                { id: 'arrangement', label: 'Editable arrangement', song },
+                ...(song.premiumTakes ?? []).map((t, i) => ({
+                  id: t.id,
+                  label: `Studio take ${(song.premiumTakes?.length ?? 1) - i}`,
+                  audio: t.audio,
+                })),
+              ]);
+            }}
+          >
+            Compare at the same moment
+          </button>
+          <p className="take-explanation">
+            Generated performance · a finished mix. Shape individual parts in
+            the arrangement, then make another take.
+          </p>
           {/* Instrumental music has no spoken content to caption. */}
           {/* oxlint-disable-next-line jsx-a11y/media-has-caption */}
           <audio
@@ -411,15 +443,39 @@ export function PremiumStudio({
             controls
             autoPlay={take.id === 'premium-example'}
             preload="metadata"
-            onPlay={onBeforePlay}
+            onPlay={(e) => {
+              pauseOtherAudio(e.currentTarget);
+              onBeforePlay();
+            }}
           />
-          {take.fingerprint !== songFingerprint(song) && (
+          {!matchesSong(take.fingerprint, song) && (
             <p>
               Your arrangement has changed. Make another take when you’re ready.
             </p>
           )}
         </div>
       )}
+      <Dialog
+        open={!!comparison}
+        onOpenChange={(open) => {
+          if (!open) setComparison(null);
+        }}
+      >
+        <DialogContent className="app-dialog comparison-dialog">
+          <DialogTitle>Which one feels like your song?</DialogTitle>
+          <DialogDescription>
+            Compare the current arrangement and saved performances at matching
+            listening levels.
+          </DialogDescription>
+          {comparison && (
+            <AudioComparison
+              sources={comparison}
+              engine={engine}
+              onBeforePlay={onBeforePlay}
+            />
+          )}
+        </DialogContent>
+      </Dialog>
     </section>
   );
 }

@@ -8,6 +8,8 @@ import {
 } from 'react';
 import Link from 'next/link';
 import {
+  Pin,
+  GitBranch,
   AudioLines,
   Guitar,
   Music2,
@@ -50,6 +52,14 @@ import {
   SelectItem,
   SelectValue,
 } from '@/components/ui/select';
+import { AudioComparison, type ComparisonSource } from './audio-comparison';
+import { pauseOtherAudio } from '@/lib/music/media';
+import {
+  directPart,
+  DIRECTIONS,
+  forkDirection,
+  originLabel,
+} from '@/lib/music/direct';
 import { CompositionPanel, MixControls } from './composition-panel';
 import { useSongHistory } from '@/hooks/use-song-history';
 import { INSTRUMENTS, instrumentInfo } from '@/lib/music/instruments';
@@ -88,6 +98,17 @@ export default function Composer() {
   const { song, load: loadSong } = history;
   const [view, setView] = useState<'song' | 'ideas'>('song');
   const [mixOpen, setMixOpen] = useState(false);
+  const [proposal, setProposal] = useState<{
+    label: string;
+    before: Song;
+    after: Song;
+    sources: ComparisonSource[];
+    retry?: (song: Song) => Song;
+    serial: number;
+  } | null>(null);
+  const [branchOpen, setBranchOpen] = useState(false);
+  const [branchName, setBranchName] = useState('');
+
   const [seekAt, setSeekAt] = useState(0);
   const [seekDraft, setSeekDraft] = useState<number | null>(null);
   const projectInput = useRef<HTMLInputElement | null>(null);
@@ -95,6 +116,7 @@ export default function Composer() {
   const [error, setError] = useState('');
   const [recorder, setRecorder] = useState<{
     instrument: Instrument;
+    captureFirst?: boolean;
     replaceId?: string;
   } | null>(null);
   const [playing, setPlaying] = useState<string | null>(null);
@@ -226,6 +248,7 @@ export default function Composer() {
     }
     stop();
     setSeekAt(offset);
+    pauseOtherAudio();
     const token = playSerial.current;
     setError('');
     setLoading(true);
@@ -249,7 +272,11 @@ export default function Composer() {
       if (token === playSerial.current) setLoading(false);
     }
   }
-  function openRecorder(instrument: Instrument, replaceId?: string) {
+  function openRecorder(
+    instrument: Instrument,
+    replaceId?: string,
+    captureFirst = false,
+  ) {
     if (!song) return;
     if (!replaceId && song.tracks.length >= MAX_TRACKS) {
       setError(
@@ -259,7 +286,53 @@ export default function Composer() {
     }
     stop();
     setDetailId(null);
-    setRecorder({ instrument, replaceId });
+    setRecorder({ instrument, replaceId, captureFirst });
+    pauseOtherAudio();
+  }
+  function propose(label: string, after: Song, retry?: (song: Song) => Song) {
+    if (!song) return;
+    stop();
+    pauseOtherAudio();
+    setDetailId(null);
+    setProposal({
+      label,
+      before: song,
+      after,
+      retry,
+      serial: Date.now(),
+      sources: [
+        { id: 'before', label: 'Before', song },
+        { id: 'after', label: 'Proposed', song: after },
+      ],
+    });
+  }
+  const branching = useRef(false);
+  async function branch() {
+    if (!song || branching.current) return;
+    branching.current = true;
+    try {
+      await saves.current;
+      const current = latestSong.current;
+      if (!current || current.id !== song.id) return;
+      const next = forkDirection(current, branchName);
+      await saveSong(next);
+      stop();
+      if (currentSongId.current === song.id) loadSong(next);
+      setBranchOpen(false);
+    } catch {
+      setError(
+        'Could not save this direction. Your current song is still open.',
+      );
+    } finally {
+      branching.current = false;
+    }
+  }
+  function keepLayers(tracks: Track[], context: NonNullable<Song['context']>) {
+    updateSong((s) =>
+      tracks.reduce((next, track) => keepIdea(next, track, context), s),
+    );
+    setRecorder(null);
+    setView('song');
   }
   function keep(track: Track, context: NonNullable<Song['context']>) {
     updateSong((s) => keepIdea(s, track, context));
@@ -489,33 +562,56 @@ export default function Composer() {
             </button>
           </div>
         )}
-        <section
-          className="instrument-grid studio-instruments"
-          aria-label="Choose an instrument"
-        >
-          {INSTRUMENTS.map((instrument) => {
-            const Icon = icons[instrument.id];
-            return (
-              <button
-                key={instrument.id}
-                className={`instrument-card ${instrument.id}`}
-                style={{ background: instrument.color }}
-                disabled={!song}
-                onClick={() => openRecorder(instrument.id)}
-              >
-                <div className="instrument-top">
-                  <Icon />
-                  <Plus size={17} />
-                </div>
-                <h2>{instrument.name}</h2>
-                <p>{instrument.description}</p>
-                <span className="card-action">
-                  Tap or hum <ArrowUpRight size={15} />
-                </span>
-              </button>
-            );
-          })}
-        </section>
+        <div className="capture-first">
+          <div>
+            <strong>Catch an idea.</strong>
+            <span>Choose its instruments after you hear it.</span>
+          </div>
+          <button
+            className="button primary"
+            disabled={!song}
+            onClick={() => openRecorder('piano', undefined, true)}
+          >
+            <Mic size={18} /> Hum an idea
+          </button>
+          <button
+            className="button"
+            disabled={!song}
+            onClick={() => openRecorder('drums', undefined, true)}
+          >
+            <Drum size={18} /> Tap a rhythm
+          </button>
+        </div>
+        <details className="instrument-drawer">
+          <summary>Or start with an instrument</summary>
+          <section
+            className="instrument-grid studio-instruments"
+            aria-label="Choose an instrument"
+          >
+            {INSTRUMENTS.map((instrument) => {
+              const Icon = icons[instrument.id];
+              return (
+                <button
+                  key={instrument.id}
+                  className={`instrument-card ${instrument.id}`}
+                  style={{ background: instrument.color }}
+                  disabled={!song}
+                  onClick={() => openRecorder(instrument.id)}
+                >
+                  <div className="instrument-top">
+                    <Icon />
+                    <Plus size={17} />
+                  </div>
+                  <h2>{instrument.name}</h2>
+                  <p>{instrument.description}</p>
+                  <span className="card-action">
+                    Tap or hum <ArrowUpRight size={15} />
+                  </span>
+                </button>
+              );
+            })}
+          </section>
+        </details>
         <section className="song-section" aria-label="Your song">
           <div className="section-heading">
             <div>
@@ -582,6 +678,24 @@ export default function Composer() {
               </button>
             </div>
             <div className="history-actions">
+              <button
+                className="icon-button"
+                aria-label="Save another direction"
+                title="Save another direction"
+                disabled={!song?.tracks.length}
+                onClick={() => {
+                  stop();
+                  setBranchName(
+                    `${song?.name ?? 'My song'} · another direction`.slice(
+                      0,
+                      60,
+                    ),
+                  );
+                  setBranchOpen(true);
+                }}
+              >
+                <GitBranch size={19} />
+              </button>
               <button
                 className="icon-button"
                 aria-label="Undo"
@@ -658,6 +772,7 @@ export default function Composer() {
                 void play(arrangedTracks(song), 'all', seconds, true)
               }
               position={position}
+              onPropose={propose}
             />
           )}
           {song && (
@@ -680,7 +795,7 @@ export default function Composer() {
             <div className="empty-song">
               <AudioLines size={38} />
               <h3>A little quiet in here.</h3>
-              <p>Pick an instrument above. Your song starts with you.</p>
+              <p>Hum an idea or tap a rhythm. Your song starts with you.</p>
               <button
                 className="text-button example-button"
                 disabled={!song}
@@ -727,16 +842,25 @@ export default function Composer() {
                         {track.name}
                       </button>
                       <span>
-                        {track.generated
-                          ? 'Arranged for you'
-                          : track.intent.source === 'hum'
-                            ? 'Your melody'
-                            : track.intent.source === 'touch'
-                              ? 'Your taps'
-                              : 'Your rhythm'}
+                        {originLabel(track)}
+                        {track.pinned ? ' · kept' : ''}
                         {track.smoother ? ' · Smoothed' : ''}
                       </span>
                     </div>
+                    <button
+                      className="icon-button pin-part"
+                      aria-label={`${track.pinned ? 'Release' : 'Keep'} ${track.name}`}
+                      aria-pressed={track.pinned ?? false}
+                      title="Keep this part during automatic changes"
+                      onClick={() =>
+                        patchTrack(track.id, (t) => ({
+                          ...t,
+                          pinned: !t.pinned,
+                        }))
+                      }
+                    >
+                      <Pin size={16} />
+                    </button>
                     <button
                       className="track-strip"
                       aria-label={`Open ${track.name}`}
@@ -848,8 +972,90 @@ export default function Composer() {
           engine={audioEngine}
           onClose={() => setRecorder(null)}
           onKeep={keep}
+          onKeepLayers={keepLayers}
         />
       )}
+      <Dialog
+        open={!!proposal}
+        onOpenChange={(open) => {
+          if (!open) setProposal(null);
+        }}
+      >
+        <DialogContent className="app-dialog comparison-dialog">
+          <DialogTitle>{proposal?.label}</DialogTitle>
+          <DialogDescription>
+            Listen in context. Your song changes only when you keep the
+            proposal.
+          </DialogDescription>
+          {proposal && (
+            <>
+              <AudioComparison
+                key={proposal.serial}
+                sources={proposal.sources}
+                engine={audioEngine}
+                onBeforePlay={stop}
+              />
+              <div className="review-actions">
+                <button className="button" onClick={() => setProposal(null)}>
+                  Go back
+                </button>
+                {proposal.retry && (
+                  <button
+                    className="button"
+                    onClick={() => {
+                      const after = proposal.retry!(proposal.after);
+                      setProposal({
+                        ...proposal,
+                        after,
+                        serial: proposal.serial + 1,
+                        sources: [
+                          proposal.sources[0],
+                          { id: 'after', label: 'Proposed', song: after },
+                        ],
+                      });
+                    }}
+                  >
+                    Try another
+                  </button>
+                )}
+                <button
+                  className="button primary"
+                  onClick={() => {
+                    updateSong((s) =>
+                      s.id === proposal.before.id
+                        ? { ...proposal.after, premiumTakes: s.premiumTakes }
+                        : s,
+                    );
+                    setProposal(null);
+                  }}
+                >
+                  Keep this change
+                </button>
+              </div>
+            </>
+          )}
+        </DialogContent>
+      </Dialog>
+      <Dialog open={branchOpen} onOpenChange={setBranchOpen}>
+        <DialogContent className="app-dialog">
+          <DialogTitle>Another direction, same song.</DialogTitle>
+          <DialogDescription>
+            Save a separate editable version. Your current direction stays in
+            your library, with its recordings and studio takes.
+          </DialogDescription>
+          <label htmlFor="branch-name">Name this direction</label>
+          <input
+            id="branch-name"
+            className="part-name-input"
+            maxLength={60}
+            value={branchName}
+            onChange={(e) => setBranchName(e.target.value)}
+          />
+          <button className="button primary" onClick={() => void branch()}>
+            Save and explore this direction
+          </button>
+        </DialogContent>
+      </Dialog>
       <Dialog
         open={library !== null}
         onOpenChange={(open) => {
@@ -891,6 +1097,7 @@ export default function Composer() {
                 <div>
                   <strong>{s.name}</strong>
                   <span>
+                    {s.branchedFrom ? 'Alternate direction · ' : ''}
                     {s.tracks.length} parts ·{' '}
                     {new Date(s.updatedAt).toLocaleDateString(undefined, {
                       month: 'short',
@@ -994,6 +1201,66 @@ export default function Composer() {
           </DialogDescription>
           {detail && (
             <div className="detail-actions">
+              <p className="part-provenance">
+                {originLabel(detail)}.{' '}
+                {detail.pinned
+                  ? 'Kept during automatic changes.'
+                  : detail.generated
+                    ? 'Composed from your song’s rhythm and harmony.'
+                    : 'Your original idea stays available.'}
+              </p>
+              <details className="gentle-details" open>
+                <summary>Give this part a direction</summary>
+                <div className="direction-buttons">
+                  {DIRECTIONS.map((direction) => (
+                    <button
+                      key={direction.id}
+                      className="button"
+                      disabled={
+                        detail.pinned ||
+                        !!song?.sections?.some(
+                          (s) => s.pinned && s.trackIds.includes(detail.id),
+                        ) ||
+                        (direction.id === 'later' && !song?.sections?.length) ||
+                        (direction.id === 'answer' &&
+                          !song?.tracks.some(
+                            (t) =>
+                              t.id !== detail.id &&
+                              !t.generated &&
+                              t.intent.events.some((e) => e.pitch !== null),
+                          ))
+                      }
+                      onClick={() => {
+                        if (song)
+                          propose(
+                            direction.label,
+                            directPart(song, detail.id, direction.id),
+                          );
+                      }}
+                    >
+                      {direction.label}
+                    </button>
+                  ))}
+                </div>
+                {song?.sections?.some(
+                  (s) => s.pinned && s.trackIds.includes(detail.id),
+                ) && (
+                  <p>
+                    This part belongs to a kept section. Release that section to
+                    try a direction.
+                  </p>
+                )}
+                {detail.pinned && (
+                  <button
+                    className="text-button"
+                    onClick={() =>
+                      patchTrack(detail.id, (t) => ({ ...t, pinned: false }))
+                    }
+                  >
+                    Release this part to try a direction
+                  </button>
+                )}
+              </details>
               <label className="field-label" htmlFor="part-name">
                 Name this idea
               </label>
@@ -1044,7 +1311,8 @@ export default function Composer() {
                         ...detail,
                         id,
                         name: `${detail.name} copy`,
-                        generated: false,
+                        pinned: true,
+                        edited: true,
                       },
                     ],
                     sections: s.sections?.map((section) => ({

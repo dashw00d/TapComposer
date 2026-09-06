@@ -2,10 +2,38 @@ import { arrangedTracks } from '../music/composition';
 import { songDuration } from '../music/resolve';
 import type { Song } from '../music/types';
 export function songFingerprint(song: Song): string {
-  const text = JSON.stringify({
+  return fingerprint({
     context: song.context,
-    tracks: arrangedTracks(song),
+    tracks: arrangedTracks(song).map(
+      ({ instrument, events, duration, muted, volume, pan }) => ({
+        instrument,
+        events,
+        duration,
+        muted,
+        volume,
+        pan,
+      }),
+    ),
   });
+}
+/** Existing takes used the full track objects; retain compatibility with those saves. */
+export function matchesSong(fingerprintValue: string, song: Song): boolean {
+  if (fingerprintValue === songFingerprint(song)) return true;
+  return (
+    fingerprintValue ===
+    fingerprint({
+      context: song.context,
+      tracks: arrangedTracks(song).map((track) => {
+        const previous = { ...track };
+        delete previous.pinned;
+        delete previous.edited;
+        return previous;
+      }),
+    })
+  );
+}
+function fingerprint(value: unknown): string {
+  const text = JSON.stringify(value);
   let hash = 2166136261;
   for (let i = 0; i < text.length; i++)
     hash = Math.imul(hash ^ text.charCodeAt(i), 16777619);

@@ -1,6 +1,7 @@
 import type { Instrument, Track } from './types';
 import { songDuration } from './resolve';
 import { encodeWav } from './wav';
+import { seekExpression } from './expression';
 
 const BANKS: Partial<Record<Instrument, number[]>> = {
   piano: Array.from({ length: 17 }, (_, i) => 36 + i * 3),
@@ -244,7 +245,16 @@ export class AudioEngine {
         );
         const pan = context.createStereoPanner();
         pan.pan.value = track.pan ?? 0;
-        source.connect(gain).connect(pan).connect(master);
+        const expression = context.createGain();
+        if (event.expression?.length) {
+          expression.gain.setValueAtTime(event.expression[0].gain, at);
+          for (const point of event.expression.slice(1))
+            expression.gain.linearRampToValueAtTime(
+              point.gain,
+              at + point.time,
+            );
+        }
+        source.connect(gain).connect(expression).connect(pan).connect(master);
         source.start(at);
         source.stop(at + event.duration + release + 0.01);
         if (collect) {
@@ -253,6 +263,7 @@ export class AudioEngine {
             this.playing = this.playing.filter((s) => s !== source);
             source.disconnect();
             gain.disconnect();
+            expression.disconnect();
             pan.disconnect();
           };
         }
@@ -282,6 +293,10 @@ export class AudioEngine {
             ...e,
             time: Math.max(0, e.time - offsetSeconds),
             duration: e.duration - Math.max(0, offsetSeconds - e.time),
+            expression: seekExpression(
+              e.expression,
+              Math.max(0, offsetSeconds - e.time),
+            ),
           })),
       }));
     const generation = this.generation;

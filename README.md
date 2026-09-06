@@ -4,7 +4,7 @@ Tap or hum an idea. TapComposer interprets it through an instrument, adds backin
 
 ## Run
 
-Requires Node.js 22.13+ and npm.
+Requires Node.js 22.15+ and npm.
 
 ```sh
 npm ci
@@ -20,15 +20,17 @@ The local server reads `.env.local` (see `.env.example`). The configured GPU ser
 
 ## Making a song
 
-1. Choose piano, drums, bass, guitar, strings, or synth. Every instrument accepts humming, the touch/keyboard tap pad, or microphone desk taps.
-2. Hear an interpretation, retry or smooth it, then keep it. The first idea establishes a pulse and provisional key. Taps become chords, bass movement or a melody according to the chosen instrument.
+1. Start with **Hum an idea** or **Tap a rhythm**, then audition piano, drums, bass, guitar, strings, or synth. Expand the instrument drawer to choose a sound before recording. Every instrument accepts every input.
+2. Hear an interpretation, retry or smooth it, then keep it. Optional controls layer several instruments from the same recording and audition them with the song. The first idea establishes a pulse and provisional key. Taps become chords, bass movement or a melody according to the chosen instrument.
 3. Keeping an idea automatically creates complementary backing and a five-section song. A hummed melody informs the harmony; your original performance and recording remain available.
 4. Choose a feel, change the energy, or try another version. Section order, length, instrument membership and your recorded ideas survive regeneration.
-5. Shape sections: move, lengthen, shorten, duplicate, remove, rename, decide which parts play, set entrances, play a part once or repeat it, and move pitched parts up or down an octave.
-6. Change any idea's instrument without recording again. Preview, rename, duplicate, smooth, replace or remove parts. Balance exposes level, pan, mute, solo and overall volume.
+5. Drag section titles to reorder and right edges to resize; buttons and arrow keys offer the same changes. Section options include names, entrances, smooth fades, repetition and octave changes. **Shape the journey** reveals a drawable energy curve, accessible sliders and presets that shape dynamics and backing; suggesting lengths is optional.
+6. Select a part for musical directions: simpler, more movement, answer the melody, come in later, or leave more space. Suggested changes and regenerated arrangements open a Before/Proposed comparison with Keep, Go back and, for arrangements, Try another. Accepted directions are kept automatically and remain undoable. Change any idea's instrument without recording again. Preview, rename, duplicate, smooth, replace or remove parts. Balance exposes level, pan, mute, solo and overall volume.
 7. Play the song or its ingredients, seek to a section or position, repeat and adjust song speed. Save the full arrangement as stereo WAV, 192 kbps MP3, or MIDI. Download a project backup to move an editable song, including original audio, to another browser.
 
-8. In Premium, give the song a studio finish. Add optional direction, choose how closely it follows the arrangement, then make a take. Listen, compare, save WAV, or keep arranging and render again. Up to three takes survive browser saves and editable project backups. Free mode keeps all local tools and makes no audio uploads.
+8. In Premium, give the song a studio finish. Add optional direction, choose how closely it follows the arrangement, then make a take. Compare the editable arrangement and saved takes at a shared playback position with RMS listening levels matched by attenuation, save WAV, or keep arranging and render again. Up to three takes survive browser saves and editable project backups. Free mode keeps all local tools and makes no audio uploads.
+
+**Keep** pins a part, a section (including its shared parts), or harmony against automatic changes. Direct manual edits remain available. Keeping editable parts does not guarantee identical notes in the separate ACE-Step finished mix. **Save another direction** creates a separate editable song with its source recordings and studio takes; both remain in the local library.
 
 The app supports 24 parts, 30 seconds per take, 12 sections and at most 512 beats of arrangement. These are resource limits rather than setup choices. Songs autosave locally; undo/redo retains up to 50 edits. Existing two-instrument songs retain their patterns and recordings and can be expanded with **Build my song**.
 
@@ -57,7 +59,7 @@ Free mode runs music processing on the device. Premium adds ACE-Step XL cover re
 | `components/composition-panel.tsx` | Automatic composition, optional section arrangement and balance                            |
 | `components/composer.tsx`          | Studio, transport, library, instrument changes and export                                  |
 
-The `MusicalIntent` layer separates human input from instrument performance. Tempo changes scale playback without rewriting source timing. Playback, WAV/MP3 and MIDI use the same arrangement, section membership and mix choices. Regeneration replaces suggested backing while retaining original ideas and manual structure.
+The `MusicalIntent` layer separates human input from instrument performance. Tempo changes scale playback without rewriting source timing. Playback, WAV/MP3 and MIDI use the same arrangement, section membership and mix choices. Section fades use continuous Web Audio gain envelopes; MIDI approximates them with CC11 expression at quarter-beat intervals. Regeneration replaces suggested backing while retaining original ideas and manual structure.
 
 Humming uses a pretrained CREPE Tiny neural pitch tracker, executed locally by ONNX Runtime Web in the analysis worker. The model and runtime load when the humming recorder opens and remain warm between takes. Confidence and silence gates filter predictions before shared note segmentation. Model loading, unsupported devices and slow inference fall back to YIN; capture and cancellation remain available. Tapping continues to use onset detection. The immediate composer uses local chord scoring and instrument rules. Premium then renders the actual arrangement with ACE-Step XL, preserving tempo/key conditioning and editable source parts. See [MODEL_EVALUATION.md](./MODEL_EVALUATION.md) for the evaluated alternatives and limitations.
 
@@ -67,7 +69,7 @@ Four sample banks are bundled locally: grand piano, electric bass, acoustic guit
 
 ## Verification and practical limits
 
-`npm run check` runs strict TypeScript, application lint, and 40 automated engine, persistence, audio and component interaction tests. Coverage includes pitch/noise/tap fixtures, all instrument/input combinations, automatic structure and variations, preservation of manual edits, tempo scaling, entrances/repeat/register, seek/repeat scheduling, backup import validation, MIDI, undo, original-audio persistence, sample decoding, bounded stereo rendering and WAV/MP3 decoding. Component interaction tests exercise arranging and the tap-to-piano keep flow in jsdom. Production output is built and checked through HTTP requests.
+`npm run check` runs strict TypeScript, application lint, and automated engine, persistence, audio and component interaction tests. Coverage includes pitch/noise/tap fixtures, all instrument/input combinations, automatic structure and variations, preservation of manual edits, tempo scaling, entrances/repeat/register, seek/repeat scheduling, backup import validation, MIDI, undo, original-audio persistence, sample decoding, bounded stereo rendering and WAV/MP3 decoding. Additional coverage exercises pins, directions, independent branches, layered source retention, fade envelopes in real audio, comparison position across rapid switches, and discard/retry/accept/undo in the complete composer. Component tests run in jsdom with the same Vinext link alias used by the application. Production output is built and checked through HTTP requests.
 
 The untouched generated Shadcn catalog and its generated mobile hook are excluded from application lint because of upstream lint violations. They remain typechecked; application code and tests are linted.
 

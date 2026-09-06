@@ -1,3 +1,4 @@
+import { sectionExpression } from './expression';
 import { chordAt, inferHarmony } from './harmony';
 import { buildIntent } from './analyze';
 import { inferContext, resolveIntent } from './resolve';
@@ -43,13 +44,17 @@ const clamp = (n: number, a: number, b: number) => Math.max(a, Math.min(b, n));
 export const beatSeconds = (context: SongContext | null) =>
   60 / (context?.tempo ?? 100);
 export function keepIdea(song: Song, track: Track, context: SongContext): Song {
+  if (song.harmonyPinned && song.context) context = song.context;
   const replacing = song.tracks.some((part) => part.id === track.id);
   return composeSong({
     ...song,
     context,
     sections: song.sections?.map((section) => ({
       ...section,
-      trackIds: replacing ? section.trackIds : [...section.trackIds, track.id],
+      trackIds:
+        replacing || section.pinned
+          ? section.trackIds
+          : [...section.trackIds, track.id],
     })),
     tracks: replacing
       ? song.tracks.map((part) =>
@@ -120,13 +125,26 @@ export function composeSong(
   options: Partial<ComposeSettings> = {},
 ): Song {
   const settings = { ...DEFAULT_COMPOSE, ...input.compose, ...options };
-  let originals = input.tracks.filter((t) => !t.generated);
+  const protectedIds = new Set(
+    input.sections?.filter((s) => s.pinned).flatMap((s) => s.trackIds) ?? [],
+  );
+  let originals = input.tracks.filter(
+    (t) => !t.generated || t.pinned || protectedIds.has(t.id),
+  );
   if (!originals.length) return input;
   const melodic = originals.find((t) =>
     t.intent.events.some((e) => e.pitch !== null),
   );
   let context = input.context ?? inferContext((melodic ?? originals[0]).intent);
-  if (melodic) {
+  if (input.harmonyPinned && !context.chords?.length) {
+    context = {
+      ...context,
+      chords: [0, 4, 8, 12].map((at) =>
+        chordAt(at, context, input.compose?.variation ?? 0),
+      ),
+    };
+  }
+  if (melodic && !input.harmonyPinned) {
     const sourceContext = {
       ...context,
       tempo: melodic.sourceTempo ?? context.tempo,
@@ -140,6 +158,9 @@ export function composeSong(
   // chord interpretation follow new melodic context as the song takes shape.
   originals = originals.map((track) => {
     if (
+      track.pinned ||
+      protectedIds.has(track.id) ||
+      input.harmonyPinned ||
       track.instrument === 'drums' ||
       track.intent.events.some((e) => e.pitch !== null)
     )
@@ -368,6 +389,7 @@ export function composeSong(
       nextIds = new Set(tracks.map((t) => t.id));
     const fresh = tracks.filter((t) => !existingIds.has(t.id));
     sections = input.sections.map((section) => {
+      if (section.pinned) return section;
       const removed = section.trackIds.filter((id) => !nextIds.has(id));
       const additions = fresh.filter(
         (t) =>
@@ -472,8 +494,15 @@ export function arrangedTracks(song: Song, onlySection?: string): Track[] {
               duration: Math.max(0.02, end * beat),
               velocity: clamp(
                 event.velocity * (0.62 + section.energy * 0.38),
-                0.05,
+                0.001,
                 1,
+              ),
+              expression: sectionExpression(
+                setting,
+                at,
+                at + end,
+                sectionBeats,
+                beat,
               ),
             });
           }
@@ -537,7 +566,7 @@ export function changeInstrument(
     name: track.generated
       ? `${instrument[0].toUpperCase() + instrument.slice(1)} idea`
       : track.name,
-    generated: false,
+    ...(track.generated ? { pinned: true, edited: true } : {}),
   };
 }
 export function moveSection(song: Song, id: string, direction: -1 | 1): Song {

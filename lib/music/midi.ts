@@ -1,5 +1,6 @@
 import { arrangedTracks } from './composition';
 import type { Song, Instrument } from './types';
+import { gainAt } from './expression';
 const programs: Record<Instrument, number> = {
   piano: 0,
   drums: 0,
@@ -55,8 +56,26 @@ export function exportMidi(song: Song): Blob {
         bytes: [176 + channel, 10, Math.round(((track.pan ?? 0) + 1) * 63.5)],
       },
     ];
+    const expression = new Map<number, number>();
+    const hasFades = track.events.some((e) => e.expression?.length);
     for (const e of track.events) {
       const at = Math.round((e.time / beat) * ticks);
+      if (hasFades) {
+        expression.set(at, Math.round(gainAt(e.expression ?? [], 0) * 127));
+        if (e.expression?.length) {
+          // MIDI CC11 follows the same envelope, sampled every quarter beat.
+          for (let t = 0; t <= e.duration; t += beat / 4)
+            expression.set(
+              Math.round(((e.time + t) / beat) * ticks),
+              Math.round(gainAt(e.expression, t) * 127),
+            );
+          for (const p of e.expression)
+            expression.set(
+              Math.round(((e.time + p.time) / beat) * ticks),
+              Math.round(p.gain * 127),
+            );
+        }
+      }
       events.push(
         {
           at,
@@ -75,6 +94,8 @@ export function exportMidi(song: Song): Blob {
         },
       );
     }
+    for (const [at, value] of expression)
+      events.push({ at, bytes: [176 + channel, 11, value] });
     events.sort((a, b) => a.at - b.at || a.bytes[0] - b.bytes[0]);
     let previous = 0;
     const bytes: number[] = [];

@@ -1,3 +1,4 @@
+import { registerHooks } from 'node:module';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { JSDOM } from 'jsdom';
@@ -152,7 +153,7 @@ void test('arrangement controls change audible section membership, order and len
   assert.equal(song.sections![0].parts?.[id].repeat, false);
   cleanup();
 });
-void test('piano accepts tap input, previews interpreted chords, then keeps the original idea', async () => {
+void test('tap input can audition layered piano and strings while keeping the original idea', async () => {
   const engine = new AudioEngine();
   engine.ready = async () => ({}) as AudioContext;
   engine.tap = async () => {};
@@ -160,6 +161,7 @@ void test('piano accepts tap input, previews interpreted chords, then keeps the 
   engine.play = async () => ({ startAt: 0, duration: 4 });
   engine.load = async () => {};
   let kept: Track | null = null;
+  let layers: Track[] = [];
   const song = newSong();
   const now = performance.now.bind(performance);
   let clock = 10000;
@@ -177,6 +179,10 @@ void test('piano accepts tap input, previews interpreted chords, then keeps the 
         onKeep={(track) => {
           kept = track;
         }}
+        onKeepLayers={(tracks) => {
+          layers = tracks;
+          kept = tracks[0];
+        }}
       />,
     );
     fireEvent.click(screen.getByRole('button', { name: 'Tap pad' }));
@@ -191,7 +197,15 @@ void test('piano accepts tap input, previews interpreted chords, then keeps the 
     await waitFor(() =>
       assert.ok(screen.getByRole('button', { name: 'Keep it' })),
     );
+    fireEvent.click(screen.getByText('Layer sounds or hear it with the song'));
+    fireEvent.click(
+      screen.getByRole('switch', { name: 'Use more than one instrument' }),
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Strings' }));
     fireEvent.click(screen.getByRole('button', { name: 'Keep it' }));
+    assert.equal(layers.length, 2);
+    assert.equal(layers[1].instrument, 'strings');
+    assert.equal(layers[0].intent, layers[1].intent);
     assert.ok(kept);
     const track = kept as Track;
     assert.equal(track.instrument, 'piano');
@@ -292,6 +306,135 @@ void test('premium renders the arrangement, collects its take, and free mode mak
   } finally {
     cleanup();
     globalThis.fetch = oldFetch;
+    localStorage.clear();
+  }
+});
+
+void test('comparison keeps the listening moment even across rapid switches', async () => {
+  const { AudioComparison } = await import('../components/audio-comparison');
+  const engine = new AudioEngine();
+  engine.render = async () =>
+    ({
+      numberOfChannels: 1,
+      sampleRate: 44100,
+      getChannelData: () => new Float32Array([0.1, -0.1]),
+    }) as unknown as AudioBuffer;
+  let beforePlay = 0;
+  try {
+    const view = render(
+      <AudioComparison
+        sources={[
+          { id: 'a', label: 'Before', song: sample() },
+          { id: 'b', label: 'Proposed', song: sample() },
+        ]}
+        engine={engine}
+        onBeforePlay={() => {
+          beforePlay++;
+        }}
+      />,
+    );
+    await waitFor(() =>
+      assert.ok(screen.getByRole('button', { name: 'Proposed' })),
+    );
+    const audio = view.container.querySelector('audio')!;
+    Object.defineProperty(audio, 'duration', { value: 20, configurable: true });
+    Object.defineProperty(audio, 'paused', {
+      value: false,
+      configurable: true,
+    });
+    let resumed = 0;
+    audio.play = async () => {
+      resumed++;
+    };
+    audio.currentTime = 12;
+    fireEvent.click(screen.getByRole('button', { name: 'Proposed' }));
+    // Loading a different source resets media time before metadata arrives.
+    audio.currentTime = 0;
+    fireEvent.click(screen.getByRole('button', { name: 'Before' }));
+    fireEvent.loadedMetadata(audio);
+    assert.equal(audio.currentTime, 12);
+    assert.equal(resumed, 1);
+    fireEvent.play(audio);
+    assert.equal(beforePlay, 1);
+  } finally {
+    cleanup();
+  }
+});
+
+void test('suggestions can be discarded, retried, accepted once, and undone in the composer', async () => {
+  const { indexedDB } = await import('fake-indexeddb');
+  Object.defineProperty(globalThis, 'indexedDB', {
+    value: indexedDB,
+    configurable: true,
+  });
+  const { saveSong, listSongs } = await import('../lib/music/storage');
+  // Match Vinext's production alias when loading the complete app outside Vite.
+  const aliases = registerHooks({
+    resolve(specifier, context, next) {
+      return next(
+        specifier === 'next/link' ? 'vinext/shims/link' : specifier,
+        context,
+      );
+    },
+  });
+  const { default: Composer } = await import('../components/composer');
+  aliases.deregister();
+  const song = sample();
+  await saveSong(song);
+  localStorage.setItem('tapcomposer-service', 'free');
+  // Store the method for restoration, without invoking it unbound.
+  // oxlint-disable-next-line typescript/unbound-method
+  const renderAudio = AudioEngine.prototype.render;
+  AudioEngine.prototype.render = async () =>
+    ({
+      numberOfChannels: 1,
+      sampleRate: 44100,
+      getChannelData: () => new Float32Array([0.1, -0.1]),
+    }) as unknown as AudioBuffer;
+  try {
+    render(<Composer />);
+    await waitFor(() =>
+      assert.ok(screen.getByRole('button', { name: 'Try another version' })),
+    );
+    assert.ok(
+      screen.getByRole('button', { name: 'Undo' }).hasAttribute('disabled'),
+    );
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Try another version' }),
+    );
+    await waitFor(() =>
+      assert.ok(screen.getByRole('button', { name: 'Proposed' })),
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Go back' }));
+    await waitFor(() => assert.equal(screen.queryByRole('dialog'), null));
+    assert.ok(
+      screen.getByRole('button', { name: 'Undo' }).hasAttribute('disabled'),
+    );
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Try another version' }),
+    );
+    fireEvent.click(screen.getByRole('button', { name: /^Try another$/ }));
+    fireEvent.click(screen.getByRole('button', { name: 'Keep this change' }));
+    await waitFor(async () =>
+      assert.equal(
+        (await listSongs()).find((s) => s.id === song.id)!.compose!.variation,
+        2,
+      ),
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Undo' }));
+    await waitFor(async () =>
+      assert.equal(
+        (await listSongs()).find((s) => s.id === song.id)!.compose!.variation,
+        0,
+      ),
+    );
+    assert.ok(
+      screen.getByRole('button', { name: 'Undo' }).hasAttribute('disabled'),
+      'One accepted proposal should create one undo step',
+    );
+  } finally {
+    cleanup();
+    AudioEngine.prototype.render = renderAudio;
     localStorage.clear();
   }
 });
