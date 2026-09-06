@@ -1,4 +1,10 @@
-export type Instrument = 'piano' | 'drums';
+export type Instrument =
+  | 'piano'
+  | 'drums'
+  | 'bass'
+  | 'guitar'
+  | 'strings'
+  | 'synth';
 export type InputSource = 'hum' | 'microphone-taps' | 'touch';
 export interface IntentEvent {
   time: number;
@@ -19,6 +25,7 @@ export interface SongContext {
   key: number;
   mode: 'major' | 'minor';
   confidence: number;
+  chords?: number[][];
 }
 export interface PerformanceEvent {
   time: number;
@@ -36,6 +43,30 @@ export interface Track {
   original: Blob | null;
   muted: boolean;
   smoother: boolean;
+  volume?: number;
+  pan?: number;
+  solo?: boolean;
+  generated?: boolean;
+  sourceTempo?: number;
+}
+export type Feel = 'easy' | 'bright' | 'dreamy' | 'driving';
+export interface SectionPart {
+  offsetBeats: number;
+  repeat: boolean;
+  transpose: number;
+}
+export interface SongSection {
+  id: string;
+  name: string;
+  bars: number;
+  energy: number;
+  trackIds: string[];
+  parts?: Record<string, SectionPart>;
+}
+export interface ComposeSettings {
+  feel: Feel;
+  energy: number;
+  variation: number;
 }
 export interface Song {
   version: 1;
@@ -45,9 +76,12 @@ export interface Song {
   context: SongContext | null;
   repeat: boolean;
   updatedAt: number;
+  sections?: SongSection[];
+  compose?: ComposeSettings;
+  masterVolume?: number;
 }
 export const MAX_SECONDS = 30;
-export const MAX_TRACKS = 12;
+export const MAX_TRACKS = 24;
 export function newSong(): Song {
   return {
     version: 1,

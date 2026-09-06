@@ -921,3 +921,492 @@ footer {
     gap: 8px;
   }
 }
+/* The composition workspace keeps musical structure visible without exposing a note editor. */
+.studio-workspace {
+  max-width: 1380px;
+  padding-top: 38px;
+}
+.studio-workspace .intro {
+  margin-bottom: 28px;
+}
+.studio-workspace h1 {
+  font-size: 40px;
+}
+.studio-instruments {
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 12px;
+}
+.studio-instruments .instrument-card {
+  padding: 20px 17px 15px;
+  border-radius: 15px;
+}
+.studio-instruments .instrument-top {
+  margin-bottom: 22px;
+}
+.studio-instruments .instrument-top > svg:first-child {
+  width: 30px;
+  height: 30px;
+}
+.studio-instruments h2 {
+  font-size: 23px;
+  letter-spacing: -0.7px;
+}
+.studio-instruments p {
+  font-size: 13px;
+  line-height: 1.45;
+  min-height: 39px;
+}
+.studio-instruments .card-action {
+  font-size: 13px;
+  margin-top: 16px;
+  padding-top: 12px;
+}
+.studio-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin: 18px 0;
+}
+.view-buttons {
+  display: flex;
+  gap: 4px;
+  background: #202731;
+  padding: 4px;
+  border-radius: 10px;
+}
+.view-buttons button {
+  min-height: 38px;
+  padding: 8px 18px;
+  background: none;
+  border: 0;
+  border-radius: 7px;
+  color: #a7b4c1;
+  font-size: 14px;
+}
+.view-buttons button[aria-pressed='true'] {
+  color: #f2f5f7;
+  background: #394351;
+}
+.history-actions {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+.transport-line {
+  display: flex;
+  align-items: center;
+  gap: 17px;
+  color: #bac6d2;
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+  margin: 19px 0 26px;
+}
+.transport-line > [data-slot='slider'] {
+  flex: 1;
+}
+.transport-line > span {
+  min-width: 36px;
+}
+.composition-panel {
+  background: #191f28;
+  border: 1px solid #36404d;
+  border-radius: 17px;
+  padding: 24px;
+  margin-bottom: 25px;
+}
+.arranger-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+}
+.arranger-heading h2 {
+  margin: 0;
+  font-size: 25px;
+  font-weight: 500;
+  letter-spacing: -0.8px;
+}
+.arranger-heading .eyebrow {
+  font-size: 11px;
+  margin-bottom: 8px;
+}
+.feel-controls {
+  display: grid;
+  grid-template-columns: 220px 1fr 1fr;
+  gap: 35px;
+  align-items: center;
+  margin-top: 25px;
+}
+.feel-choice {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.feel-choice > label,
+.macro-control > label {
+  font-size: 13px;
+  color: #b7c2cf;
+}
+.feel-select {
+  min-height: 40px !important;
+  width: 100% !important;
+  background: #252e3a !important;
+}
+.macro-control > label {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 19px;
+}
+.arranger-hint {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #aab8a5;
+  font-size: 13px;
+  margin: 21px 0;
+}
+.song-map {
+  display: flex;
+  gap: 10px;
+  overflow-x: auto;
+  padding: 4px 0 13px;
+  scrollbar-color: #4b5b6b #202731;
+}
+.section-card {
+  flex: 1;
+  min-width: 190px;
+  max-width: 280px;
+  border: 1px solid #3c4654;
+  border-radius: 11px;
+  background: #222a35;
+  overflow: hidden;
+}
+.section-card.current-section {
+  border-color: #9aae77;
+}
+.section-seek {
+  width: 100%;
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  gap: 9px;
+  align-items: center;
+  padding: 15px 12px;
+  background: transparent;
+  color: #e4ebf2;
+  border: 0;
+  border-bottom: 1px solid #3a4451;
+  text-align: left;
+}
+.section-seek > span {
+  font-size: 11px;
+  color: #a7b7c7;
+  font-variant-numeric: tabular-nums;
+}
+.section-seek > strong {
+  font-size: 13px;
+  font-weight: 550;
+}
+.section-seek > small {
+  font-size: 11px;
+  color: #a7b7c7;
+}
+.section-lanes {
+  padding: 10px 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.section-lane {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  width: 100%;
+  height: 30px;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  font-size: 12px;
+  text-align: left;
+  border: 1px solid #46515e;
+  border-radius: 5px;
+  color: #a0abba;
+  background: #1b222c;
+  padding: 5px 7px;
+}
+.section-lane.included {
+  background: color-mix(in srgb, var(--part-color) 20%, #17202a);
+  border-color: color-mix(in srgb, var(--part-color) 50%, #17202a);
+  color: #edf0f5;
+}
+.section-lane > i {
+  flex-shrink: 0;
+  width: 5px;
+  height: 12px;
+  border-radius: 2px;
+  background: var(--part-color);
+  opacity: 0.25;
+}
+.section-lane.included > i {
+  opacity: 1;
+}
+.section-actions {
+  display: flex;
+  justify-content: space-around;
+  border-top: 1px solid #3a4451;
+  padding: 5px 4px;
+}
+.section-actions button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 33px;
+  min-width: 27px;
+  background: none;
+  color: #b5c4d4;
+  border: 0;
+  border-radius: 5px;
+}
+.section-actions button:hover {
+  background: #3b4655;
+}
+.arrangement-empty {
+  padding: 30px;
+  border: 1px dashed #536171;
+  border-radius: 10px;
+  text-align: center;
+  color: #afbbc8;
+  font-size: 14px;
+}
+.studio-track-list {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 11px;
+}
+.studio-track-list .track-row {
+  gap: 10px;
+  padding: 14px 10px;
+}
+.studio-track-list .track-info {
+  width: 140px;
+}
+.studio-track-list .track-name {
+  font-size: 14px;
+}
+.studio-track-list .track-info > span {
+  font-size: 12px;
+}
+.studio-track-list .icon-button {
+  width: 30px;
+}
+.mix-panel {
+  border: 1px solid #384657;
+  padding: 23px;
+  border-radius: 15px;
+  background: #1a222c;
+  margin: 20px 0;
+}
+.mix-row {
+  display: grid;
+  grid-template-columns: 170px 1fr 100px 100px;
+  align-items: center;
+  gap: 24px;
+  min-height: 52px;
+  border-bottom: 1px solid #313d4c;
+}
+.mix-row > span {
+  font-size: 14px;
+}
+.mix-row > label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  white-space: nowrap;
+}
+.master-row {
+  display: flex;
+  align-items: center;
+  gap: 35px;
+  margin-top: 24px;
+  font-size: 14px;
+}
+.master-row > [data-slot='slider'] {
+  max-width: 400px;
+}
+.field-label {
+  text-align: left;
+  font-size: 13px;
+  color: #b2c0cf;
+}
+.part-name-input {
+  border: 1px solid #455365;
+  border-radius: 8px;
+  padding: 10px 12px;
+  background: #171f2a;
+  color: #eef2f7;
+}
+.mode-buttons button {
+  width: auto;
+  flex: 1;
+  padding: 10px 6px;
+  font-size: 13px;
+}
+@media (max-width: 1100px) {
+  .studio-instruments {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+  .studio-instruments .instrument-top {
+    margin-bottom: 13px;
+  }
+  .studio-instruments p {
+    min-height: 0;
+  }
+  .feel-controls {
+    gap: 22px;
+    grid-template-columns: 180px 1fr 1fr;
+  }
+  .studio-track-list {
+    grid-template-columns: 1fr;
+  }
+  .studio-track-list .track-info {
+    width: 170px;
+  }
+}
+@media (max-width: 640px) {
+  .studio-workspace h1 {
+    font-size: 33px;
+  }
+  .studio-workspace {
+    padding-top: 28px;
+  }
+  .studio-instruments {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 8px;
+  }
+  .studio-instruments .instrument-card {
+    padding: 14px 10px 11px;
+  }
+  .studio-instruments .instrument-top > svg:first-child {
+    width: 26px;
+    height: 26px;
+  }
+  .studio-instruments .instrument-top > svg:last-child {
+    display: none;
+  }
+  .studio-instruments h2 {
+    font-size: 20px;
+  }
+  .studio-instruments p {
+    display: none;
+  }
+  .studio-instruments .card-action {
+    font-size: 12px;
+    gap: 3px;
+    margin-top: 12px;
+  }
+  .studio-toolbar {
+    flex-wrap: wrap;
+    gap: 12px;
+  }
+  .history-actions {
+    margin-left: auto;
+  }
+  .composition-panel {
+    padding: 20px 14px;
+  }
+  .arranger-heading {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 16px;
+  }
+  .arranger-heading h2 {
+    font-size: 23px;
+  }
+  .arranger-heading > .button {
+    width: 100%;
+  }
+  .feel-controls {
+    grid-template-columns: 1fr;
+    gap: 24px;
+  }
+  .feel-choice {
+    flex-direction: row;
+    align-items: center;
+    gap: 15px;
+  }
+  .feel-select {
+    flex: 1;
+  }
+  .feel-choice label {
+    flex-shrink: 0;
+  }
+  .section-card {
+    min-width: 210px;
+  }
+  .arranger-hint {
+    font-size: 12px;
+    line-height: 1.6;
+  }
+  .studio-track-list .track-info {
+    flex: 1;
+    width: auto;
+  }
+  .mix-panel {
+    padding: 18px 14px;
+  }
+  .mix-row {
+    grid-template-columns: 1fr 1fr;
+    gap: 15px;
+    padding: 13px 0;
+  }
+  .mix-row > label {
+    justify-self: end;
+  }
+  .master-row {
+    gap: 18px;
+  }
+  .view-buttons button {
+    padding: 8px 12px;
+  }
+}
+.arrangement-help {
+  color: #a8b8c8;
+  font-size: 12px;
+  line-height: 1.6;
+  margin: 0 0 12px;
+}
+.section-editor {
+  max-width: min(580px, calc(100vw - 32px)) !important;
+}
+.section-part-edit {
+  border: 1px solid #3c4a5b;
+  border-radius: 12px;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 17px;
+}
+.section-part-edit > strong {
+  font-weight: 550;
+  font-size: 16px;
+}
+.section-part-edit > label {
+  font-size: 13px;
+  color: #acbac8;
+}
+.section-part-options {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.section-part-options > label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+}
+.section-actions button {
+  min-width: 24px;
+}

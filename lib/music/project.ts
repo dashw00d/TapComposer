@@ -1,0 +1,193 @@
+import type { Song, Track, Instrument } from './types';
+import { INSTRUMENTS } from './instruments';
+export async function exportProject(song: Song): Promise<Blob> {
+  const tracks = await Promise.all(
+    song.tracks.map(async (track) => {
+      let original: string | null = null;
+      if (track.original) {
+        const bytes = new Uint8Array(await track.original.arrayBuffer());
+        let text = '';
+        for (let i = 0; i < bytes.length; i += 8192)
+          text += String.fromCharCode(...bytes.subarray(i, i + 8192));
+        original = btoa(text);
+      }
+      return { ...track, original };
+    }),
+  );
+  return new Blob(
+    [JSON.stringify({ ...song, format: 'tapcomposer-project', tracks })],
+    { type: 'application/json' },
+  );
+}
+function object(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null;
+}
+function number(value: unknown, min: number, max: number) {
+  return (
+    typeof value === 'number' &&
+    Number.isFinite(value) &&
+    value >= min &&
+    value <= max
+  );
+}
+export async function importProject(file: Blob): Promise<Song> {
+  if (file.size > 100 * 1024 * 1024)
+    throw new Error(
+      'That project is too large. Choose a TapComposer project under 100 MB.',
+    );
+  const data: unknown = JSON.parse(await file.text());
+  if (
+    !object(data) ||
+    data.format !== 'tapcomposer-project' ||
+    data.version !== 1 ||
+    typeof data.name !== 'string' ||
+    !Array.isArray(data.tracks) ||
+    data.tracks.length > 24
+  )
+    throw new Error('Choose a valid TapComposer project file.');
+  const empty = data.tracks.length === 0 && data.context === null;
+  if (
+    !empty &&
+    (!object(data.context) ||
+      !number(data.context.tempo, 40, 240) ||
+      !number(data.context.key, 0, 11) ||
+      !['major', 'minor'].includes(String(data.context.mode)))
+  )
+    throw new Error('This project has invalid song settings.');
+  if (
+    object(data.context) &&
+    data.context.chords !== undefined &&
+    (!Array.isArray(data.context.chords) ||
+      data.context.chords.length > 32 ||
+      !data.context.chords.every(
+        (chord) =>
+          Array.isArray(chord) &&
+          chord.length >= 3 &&
+          chord.length <= 8 &&
+          chord.every((note) => number(note, 0, 127)),
+      ))
+  )
+    throw new Error('This project contains invalid harmony.');
+  const tracks: Track[] = data.tracks.map((raw) => {
+    if (
+      !object(raw) ||
+      typeof raw.id !== 'string' ||
+      typeof raw.name !== 'string' ||
+      !INSTRUMENTS.some((i) => i.id === raw.instrument) ||
+      !number(raw.duration, 0, 120) ||
+      !Array.isArray(raw.events) ||
+      raw.events.length > 10000 ||
+      (raw.sourceTempo !== undefined && !number(raw.sourceTempo, 40, 240)) ||
+      !object(raw.intent) ||
+      !Array.isArray(raw.intent.events) ||
+      raw.intent.events.length > 10000 ||
+      !['hum', 'touch', 'microphone-taps'].includes(
+        String(raw.intent.source),
+      ) ||
+      !number(raw.intent.duration, 0, 120) ||
+      !number(raw.intent.confidence, 0, 1)
+    )
+      throw new Error('This project contains an invalid part.');
+    for (const event of raw.events) {
+      if (
+        !object(event) ||
+        !number(event.time, 0, 120) ||
+        !number(event.duration, 0.001, 120) ||
+        !number(event.note, 0, 127) ||
+        !number(event.velocity, 0, 1)
+      )
+        throw new Error('This project contains invalid music events.');
+    }
+    for (const event of raw.intent.events) {
+      if (
+        !object(event) ||
+        !number(event.time, 0, 120) ||
+        !number(event.duration, 0, 120) ||
+        (event.pitch !== null && !number(event.pitch, 0, 127)) ||
+        !number(event.confidence, 0, 1) ||
+        !number(event.intensity, 0, 1)
+      )
+        throw new Error('This project contains invalid source events.');
+    }
+    let original: Blob | null = null;
+    if (typeof raw.original === 'string') {
+      const binary = atob(raw.original);
+      original = new Blob([Uint8Array.from(binary, (c) => c.charCodeAt(0))], {
+        type: 'audio/wav',
+      });
+    }
+    return {
+      ...raw,
+      instrument: raw.instrument as Instrument,
+      original,
+      volume: number(raw.volume, 0, 1.5) ? raw.volume : 1,
+      pan: number(raw.pan, -1, 1) ? raw.pan : 0,
+      solo: raw.solo === true,
+      muted: raw.muted === true,
+      generated: raw.generated === true,
+    } as unknown as Track;
+  });
+  if (new Set(tracks.map((t) => t.id)).size !== tracks.length)
+    throw new Error('This project has duplicate parts.');
+  const sections = Array.isArray(data.sections) ? data.sections : [];
+  if (sections.length > 12)
+    throw new Error('This project has too many sections.');
+  for (const section of sections) {
+    if (
+      !object(section) ||
+      typeof section.id !== 'string' ||
+      typeof section.name !== 'string' ||
+      !number(section.bars, 2, 32) ||
+      !number(section.energy, 0, 1) ||
+      !Array.isArray(section.trackIds) ||
+      !section.trackIds.every((id) => tracks.some((t) => t.id === id))
+    )
+      throw new Error('This project has an invalid arrangement.');
+  }
+  if (new Set(sections.map((section) => section.id)).size !== sections.length)
+    throw new Error('This project has duplicate sections.');
+  if (
+    sections.reduce(
+      (sum, section) => sum + (section as { bars: number }).bars * 4,
+      0,
+    ) > 512
+  )
+    throw new Error('This song is too long to open safely.');
+  for (const section of sections) {
+    if (section.parts !== undefined) {
+      if (
+        !object(section.parts) ||
+        !Object.values(section.parts).every(
+          (setting) =>
+            object(setting) &&
+            number(setting.offsetBeats, 0, 127) &&
+            typeof setting.repeat === 'boolean' &&
+            number(setting.transpose, -24, 24),
+        )
+      )
+        throw new Error('This project has invalid part timing.');
+    }
+  }
+  if (
+    data.compose !== undefined &&
+    (!object(data.compose) ||
+      !['easy', 'bright', 'dreamy', 'driving'].includes(
+        String(data.compose.feel),
+      ) ||
+      !number(data.compose.energy, 0.2, 1) ||
+      !number(data.compose.variation, 0, 1000000))
+  )
+    throw new Error('This project has invalid composition settings.');
+  const parsed = data as unknown as Song;
+  return {
+    ...parsed,
+    id: crypto.randomUUID(),
+    name: data.name.slice(0, 60),
+    tracks,
+    repeat: parsed.repeat === true,
+    masterVolume: number(parsed.masterVolume, 0, 1)
+      ? parsed.masterVolume
+      : 0.85,
+    updatedAt: Date.now(),
+  };
+}

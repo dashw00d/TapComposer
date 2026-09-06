@@ -6,7 +6,8 @@ import { Mp3Encoder } from '@breezystack/lamejs';
 import { AudioEngine } from '../lib/music/audio';
 import { buildIntent } from '../lib/music/analyze';
 import { inferContext, resolveIntent } from '../lib/music/resolve';
-import type { Track } from '../lib/music/types';
+import { newSong, type Track } from '../lib/music/types';
+import { arrangedTracks, composeSong } from '../lib/music/composition';
 
 void test('real samples render non-silent bounded stereo audio and both exports decode', async () => {
   const originalFetch = globalThis.fetch;
@@ -51,7 +52,17 @@ void test('real samples render non-silent bounded stereo audio and both exports 
       muted: false,
       smoother: false,
     };
-    const rendered = await engine.render([track]);
+    const song = composeSong({ ...newSong(), context, tracks: [track] });
+    const fullSong = arrangedTracks(song);
+    const rendered = await engine.render(fullSong);
+    assert.ok(rendered.duration > 45, 'Expected a complete multi-section song');
+    const lastSection = rendered
+      .getChannelData(0)
+      .slice(Math.floor((rendered.duration - 4) * 44100));
+    assert.ok(
+      lastSection.some((value) => Math.abs(value) > 0.01),
+      'The ending should contain music',
+    );
     const left = rendered.getChannelData(0),
       right = rendered.getChannelData(1);
     let peak = 0,
@@ -65,10 +76,10 @@ void test('real samples render non-silent bounded stereo audio and both exports 
     assert.ok(peak <= 0.971);
     assert.ok(Math.sqrt(power / left.length) > 0.005);
     assert.equal(rendered.numberOfChannels, 2);
-    const wav = await engine.exportWav([track]);
+    const wav = await engine.exportWav(fullSong);
     const decoded = await decoder.decodeAudioData(await wav.arrayBuffer());
     assert.equal(decoded.numberOfChannels, 2);
-    assert.ok(decoded.duration > 2);
+    assert.ok(Math.abs(decoded.duration - rendered.duration) < 0.001);
     const encoder = new Mp3Encoder(2, 44100, 192),
       chunks: Uint8Array<ArrayBuffer>[] = [];
     const toPCM = (channel: Float32Array) =>
@@ -136,5 +147,89 @@ void test('drum-only mix renders without fetching piano samples', async () => {
     }
   } finally {
     globalThis.OfflineAudioContext = previous;
+  }
+});
+
+void test('bass, guitar, strings and synth produce distinct, sustained, pitched voices', async () => {
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async (input) => {
+    const path =
+      typeof input === 'string'
+        ? input
+        : input instanceof URL
+          ? input.href
+          : input.url;
+    const file = await readFile(new URL(`../public${path}`, import.meta.url));
+    return new Response(file);
+  };
+  const previous = globalThis.OfflineAudioContext;
+  globalThis.OfflineAudioContext =
+    NativeOfflineAudioContext as unknown as typeof OfflineAudioContext;
+  try {
+    const signatures: number[] = [];
+    for (const instrument of ['bass', 'guitar', 'strings', 'synth'] as const) {
+      const engine = new AudioEngine(),
+        intent = buildIntent('hum', [], 2);
+      const track: Track = {
+        id: instrument,
+        instrument,
+        name: instrument,
+        intent,
+        events: [{ time: 0, note: 57, duration: 1.6, velocity: 0.8 }],
+        duration: 2,
+        original: null,
+        muted: false,
+        smoother: false,
+      };
+      const decoder = new NativeOfflineAudioContext(2, 44100, 44100);
+      engine.ready = async () => decoder as unknown as AudioContext;
+      const buffer = await engine.render([track]);
+      const data = buffer.getChannelData(0);
+      let energy = 0;
+      for (const value of data) {
+        assert.ok(Number.isFinite(value));
+        energy += value * value;
+      }
+      assert.ok(energy > 1, `${instrument} is silent`);
+      signatures.push(energy);
+      if (instrument === 'strings' || instrument === 'synth')
+        assert.ok(
+          data.slice(44100, 44100 + 4410).some((v) => Math.abs(v) > 0.01),
+          `${instrument} failed to sustain`,
+        );
+    }
+    assert.equal(new Set(signatures.map((n) => n.toFixed(2))).size, 4);
+  } finally {
+    globalThis.OfflineAudioContext = previous;
+    globalThis.fetch = originalFetch;
+  }
+});
+
+void test('seek starts at the requested song clock and repeat retains the full song period', async () => {
+  // Scheduling is exercised with the actual native audio graph on an offline context.
+  const context = new NativeOfflineAudioContext(2, 44100, 44100);
+  const engine = new AudioEngine();
+  engine.ready = async () => context as unknown as AudioContext;
+  const track: Track = {
+    id: 'beat',
+    instrument: 'drums',
+    name: 'Beat',
+    intent: buildIntent('touch', [], 4),
+    events: [
+      { time: 0, note: 36, duration: 0.1, velocity: 0.8 },
+      { time: 2, note: 38, duration: 0.1, velocity: 0.8 },
+    ],
+    duration: 4,
+    original: null,
+    muted: false,
+    smoother: false,
+  };
+  try {
+    const playback = await engine.play([track], true, () => {}, undefined, 2);
+    assert.ok(playback);
+    assert.equal(playback.duration, 4);
+    assert.ok(Math.abs(playback.startAt - -1.93) < 0.01);
+  } finally {
+    engine.stop();
   }
 });

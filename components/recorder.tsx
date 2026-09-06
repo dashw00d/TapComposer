@@ -34,6 +34,8 @@ import type {
   Song,
   Track,
 } from '@/lib/music/types';
+import { patternTracks } from '@/lib/music/composition';
+import { instrumentInfo } from '@/lib/music/instruments';
 import { MAX_SECONDS } from '@/lib/music/types';
 
 interface Props {
@@ -55,8 +57,8 @@ export function Recorder({
   const [phase, setPhase] = useState<
     'ready' | 'requesting' | 'recording' | 'analyzing' | 'review'
   >('ready');
-  const [mode, setMode] = useState<'touch' | 'mic'>(
-    instrument === 'drums' ? 'touch' : 'mic',
+  const [mode, setMode] = useState<'touch' | 'mic' | 'hum'>(
+    instrument === 'drums' ? 'touch' : 'hum',
   );
   const [micReady, setMicReady] = useState(false);
   const [error, setError] = useState('');
@@ -75,8 +77,11 @@ export function Recorder({
     interval = useRef<ReturnType<typeof setInterval> | null>(null);
   const analysisCancel = useRef<(() => void) | null>(null);
   const context = useRef(song.context);
-  const backing = song.tracks.filter((t) => t.id !== replaceId);
-  const label = instrument === 'piano' ? 'Piano' : 'Drums';
+  const backing = patternTracks({
+    ...song,
+    tracks: song.tracks.filter((t) => t.id !== replaceId),
+  });
+  const label = instrumentInfo(instrument).name;
   const transition = (next: typeof phase) => {
     phaseRef.current = next;
     setPhase(next);
@@ -112,7 +117,7 @@ export function Recorder({
     if (!intent.events.length) {
       transition('ready');
       setError(
-        instrument === 'piano'
+        intent.source === 'hum'
           ? 'I couldn’t find a clear melody. Try a steady “hmm”, a little closer to the microphone.'
           : 'I couldn’t hear distinct taps. Try a few firmer taps with little gaps between them.',
       );
@@ -128,7 +133,15 @@ export function Recorder({
       })),
       duration: Math.max(0, intent.duration - trim),
     };
-    context.current = song.context ?? inferContext(normalized);
+    const hasMelody = song.tracks.some(
+      (t) => !t.generated && t.intent.events.some((e) => e.pitch !== null),
+    );
+    const inferred = inferContext(normalized);
+    context.current = song.context
+      ? !hasMelody && normalized.source === 'hum'
+        ? { ...inferred, tempo: song.context.tempo }
+        : song.context
+      : inferred;
     const arrangement = resolveIntent(
       normalized,
       instrument,
@@ -148,6 +161,7 @@ export function Recorder({
       original,
       muted: false,
       smoother: false,
+      sourceTempo: context.current.tempo,
     };
     setDraft(track);
     transition('review');
@@ -164,7 +178,7 @@ export function Recorder({
       const task = understandRecording(
         pcm,
         rate,
-        instrument === 'piano' ? 'hum' : 'microphone-taps',
+        mode === 'hum' ? 'hum' : 'microphone-taps',
       );
       analysisCancel.current = task.cancel;
       const intent = await task.result;
@@ -208,11 +222,10 @@ export function Recorder({
     engine.stop();
     const token = ++serial.current;
     try {
-      if (
-        instrument === 'piano' ||
-        backing.some((t) => t.instrument === 'piano' && !t.muted)
-      )
-        await engine.load();
+      await engine.load([
+        instrument,
+        ...backing.filter((t) => !t.muted).map((t) => t.instrument),
+      ]);
       if (
         !active.current ||
         token !== serial.current ||
@@ -243,7 +256,7 @@ export function Recorder({
       session.current = capture;
       transition('recording');
       if (backing.some((t) => !t.muted))
-        await engine.play(backing, false, () => {}, capture.startAt);
+        await engine.play(backing, true, () => {}, capture.startAt);
     } catch (e) {
       session.current?.cancel();
       session.current = null;
@@ -278,15 +291,17 @@ export function Recorder({
       transition('requesting');
       setError('');
       try {
-        if (backing.some((t) => t.instrument === 'piano' && !t.muted))
-          await engine.load();
+        await engine.load([
+          instrument,
+          ...backing.filter((t) => !t.muted).map((t) => t.instrument),
+        ]);
         await engine.ready();
         if (!active.current) return;
         tapStart.current = performance.now();
         tapEvents.current = [];
         transition('recording');
         if (backing.some((t) => !t.muted))
-          await engine.play(backing, false, () => {});
+          await engine.play(backing, true, () => {});
         // The first tap defines zero; the audio's tiny scheduling lead is immaterial for human taps.
         interval.current = setInterval(() => {
           const time = (performance.now() - tapStart.current) / 1000;
@@ -339,7 +354,10 @@ export function Recorder({
       }}
     >
       <DialogContent className="record-dialog" showCloseButton>
-        <div className={`dialog-instrument ${instrument}`}>
+        <div
+          className={`dialog-instrument ${instrument}`}
+          style={{ background: instrumentInfo(instrument).color }}
+        >
           {instrument === 'piano' ? <Piano /> : <Drum />}
         </div>
         <DialogTitle className="dialog-title">
@@ -348,7 +366,7 @@ export function Recorder({
         <DialogDescription className="dialog-description">
           {phase === 'review'
             ? 'A little idea, turned into music. Give it a listen.'
-            : instrument === 'piano'
+            : mode === 'hum'
               ? 'A few notes are enough. Hum them one at a time.'
               : mode === 'touch'
                 ? 'Tap the pad or press Space while it’s selected.'
@@ -361,8 +379,18 @@ export function Recorder({
         )}
         {phase !== 'review' ? (
           <>
-            {instrument === 'drums' && (
+            {
               <div className="mode-buttons">
+                <button
+                  className={mode === 'hum' ? 'selected' : ''}
+                  disabled={phase !== 'ready'}
+                  onClick={() => {
+                    setMode('hum');
+                    setError('');
+                  }}
+                >
+                  <Mic size={17} /> Hum
+                </button>
                 <button
                   className={mode === 'touch' ? 'selected' : ''}
                   disabled={phase !== 'ready'}
@@ -381,10 +409,10 @@ export function Recorder({
                     setError('');
                   }}
                 >
-                  <Mic size={17} /> Microphone
+                  <Hand size={17} /> Desk taps
                 </button>
               </div>
-            )}
+            }
             <div
               className={`record-zone ${phase === 'recording' ? 'is-recording' : ''}`}
             >
@@ -401,7 +429,7 @@ export function Recorder({
               {mode === 'touch' ? (
                 <button
                   className="tap-pad"
-                  aria-label="Tap drum pad"
+                  aria-label="Tap rhythm pad"
                   disabled={busy}
                   onPointerDown={(e) => {
                     if (e.button === 0) {
@@ -485,7 +513,7 @@ export function Recorder({
                       ? 'Getting ready…'
                       : phase === 'recording'
                         ? 'Listening… release to hear'
-                        : instrument === 'piano'
+                        : mode === 'hum'
                           ? 'Hold and hum'
                           : 'Hold and tap'}
                 </button>
@@ -500,10 +528,10 @@ export function Recorder({
             </div>
             {mode === 'touch' && phase === 'recording' && (
               <button className="button primary full" onClick={finishTaps}>
-                <Check size={18} /> Hear my beat
+                <Check size={18} /> Hear my idea
               </button>
             )}
-            {mode === 'mic' && micReady && !busy && (
+            {mode !== 'touch' && micReady && !busy && (
               <button
                 className="text-button"
                 onClick={() =>
@@ -535,8 +563,7 @@ export function Recorder({
                       key={i}
                       style={{
                         height: `${15 + e.velocity * 38}px`,
-                        background:
-                          instrument === 'piano' ? '#c7bdf5' : '#f2c276',
+                        background: instrumentInfo(instrument).color,
                       }}
                     />
                   ))}

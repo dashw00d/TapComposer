@@ -29,6 +29,7 @@ void test('songs and original recordings survive a database round trip', async (
   const saved = (await listSongs()).find((s) => s.id === song.id)!;
   assert.equal(await saved.tracks[0].original!.text(), 'untouched input');
   assert.equal(saved.id, song.id);
+  assert.equal(saved.tracks[0].sourceTempo, 100);
   song.name = 'Renamed song';
   await saveSong(song);
   assert.equal((await listSongs()).filter((s) => s.id === song.id).length, 1);

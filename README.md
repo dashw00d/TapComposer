@@ -1,6 +1,6 @@
-# TapComposer · MVP + polish
+# TapComposer
 
-Hum a short melody, hear it on a sampled grand piano, then tap in a drum part. No account, tempo selector, or music-theory controls are needed inside the application. The privately hosted preview may require its owner's Sites sign-in.
+Tap or hum an idea. TapComposer interprets it through an instrument, adds backing and builds a song. A compact studio lets you shape the result without entering notes or setting up music theory.
 
 ## Run
 
@@ -14,58 +14,57 @@ npm run build
 npm start
 ```
 
-`npm start` serves the built Cloudflare Worker locally. Use the URL printed by each server. Microphone capture requires HTTPS or localhost and browser permission. Headphones reduce bleed while recording over existing parts.
+Microphone capture requires HTTPS or localhost and browser permission. Headphones reduce bleed while recording over existing parts. The private Sites publication may require its owner's sign-in.
 
-## Shipped scope
+## Making a song
 
-- Piano: microphone permission, hold-to-hum and click-to-start/finish recording, pitch detection, automatic note grouping, soft timing correction, and sampled piano playback.
-- Drums: accessible touch/keyboard pad or microphone desk-tap detection; rhythm and accent interpretation into kick, snare, and hat.
-- Listen immediately, keep a take, retry, record over an existing part, and undo smoothing.
-- Up to 12 parts per song and 30 seconds per take. Existing parts play once from the same song clock while recording. The first take establishes tempo and a provisional key.
-- Independent part playback, mute, removal with undo, and whole-song repeat. Shorter parts retain their original length when a longer part is added.
-- Automatic local saving, multiple named songs, and preservation/download of original microphone WAV recordings.
-- Stereo WAV and 192 kbps MP3 downloads, rendered from audible parts using the same sampler/mix as playback. Exports contain one whole song pass plus a short effects tail.
-- Responsive layout, keyboard controls, focus-managed dialogs, reduced-motion support, error recovery, and an optional example song.
+1. Choose piano, drums, bass, guitar, strings, or synth. Every instrument accepts humming, the touch/keyboard tap pad, or microphone desk taps.
+2. Hear an interpretation, retry or smooth it, then keep it. The first idea establishes a pulse and provisional key. Taps become chords, bass movement or a melody according to the chosen instrument.
+3. Keeping an idea automatically creates complementary backing and a five-section song. A hummed melody informs the harmony; your original performance and recording remain available.
+4. Choose a feel, change the energy, or try another version. Section order, length, instrument membership and your recorded ideas survive regeneration.
+5. Shape sections: move, lengthen, shorten, duplicate, remove, rename, decide which parts play, set entrances, play a part once or repeat it, and move pitched parts up or down an octave.
+6. Change any idea's instrument without recording again. Preview, rename, duplicate, smooth, replace or remove parts. Balance exposes level, pan, mute, solo and overall volume.
+7. Play the song or its ingredients, seek to a section or position, repeat and adjust song speed. Save the full arrangement as stereo WAV, 192 kbps MP3, or MIDI. Download a project backup to move an editable song, including original audio, to another browser.
+
+The app supports 24 parts, 30 seconds per take, 12 sections and at most 512 beats of arrangement. These are resource limits rather than setup choices. Songs autosave locally; undo/redo retains up to 50 edits. Existing two-instrument songs retain their patterns and recordings and can be expanded with **Build my song**.
+
+Keyboard: Space plays/stops when focus is outside an interactive control; Ctrl/Command Z undoes; Shift Ctrl/Command Z redoes; Ctrl/Command S downloads a project backup; Escape stops playback. Dialogs, sliders and recording controls support keyboard interaction.
 
 ## Architecture
 
-All music processing runs in the browser. The hosted Worker serves the app and bundled assets; there are no recording upload endpoints, analytics, cloud inference calls, or account requirements in application code.
+Music processing runs in the browser. The hosted Worker serves the app and bundled assets; there are no recording upload endpoints, analytics, cloud inference calls, or application accounts.
 
-| Module                       | Responsibility                                                                                                                |
-| ---------------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
-| `public/worklets/capture.js` | AudioWorklet mono PCM capture, input meter, explicit song-clock start, 30-second cap; no microphone monitoring                |
-| `lib/music/capture.ts`       | Permission/capture lifecycle, cancellation, WAV preservation, analyzer-worker dispatch                                        |
-| `lib/music/analyze.ts`       | YIN pitch tracking, median smoothing, voiced-note segmentation, adaptive RMS onset detection                                  |
-| `lib/music/types.ts`         | Versioned MusicalIntent, SongContext, Track, Song, performance events                                                         |
-| `lib/music/resolve.ts`       | Pulse/key estimates, soft timing correction, piano/drum interpretation, reversible smoothing                                  |
-| `lib/music/audio.ts`         | Bundled piano samples, synthesized drum one-shots, audio-clock scheduling, gentle compression/room effects, offline rendering |
-| `lib/music/export.worker.ts` | MP3 encoding away from the interface thread                                                                                   |
-| `lib/music/storage.ts`       | IndexedDB song + original recording persistence, downloads                                                                    |
-| `components/recorder.tsx`    | Capture/review flow                                                                                                           |
-| `components/composer.tsx`    | Song workspace, local library, part actions, export                                                                           |
+| Module | Responsibility |
+| --- | --- |
+| `public/worklets/capture.js` | Audio-clock capture, meter, explicit start, 30-second cap; no microphone monitoring |
+| `lib/music/capture.ts` | Permission, cancellation, original WAV preservation, analysis worker |
+| `lib/music/analyze.ts` | YIN pitch tracking, note segmentation and adaptive tap onset detection |
+| `lib/music/resolve.ts` | Pulse/key estimates, soft correction and instrument-specific interpretation |
+| `lib/music/harmony.ts` | Melody-weighted diatonic harmony |
+| `lib/music/composition.ts` | Backing, feel/variation, section structure, tempo scaling and shared arranged event stream |
+| `lib/music/audio.ts` | Samples, drum/synth DSP, audio-clock scheduling, stereo mix, effects and offline rendering |
+| `lib/music/export.worker.ts` | MP3 encoding away from the interface thread |
+| `lib/music/project.ts`, `midi.ts` | Validated editable project backup/import and portable MIDI |
+| `lib/music/storage.ts` | IndexedDB songs/original audio and migration of source tempo |
+| `hooks/use-song-history.ts` | Snapshot undo/redo retaining original audio by reference |
+| `components/recorder.tsx` | Capture and take review |
+| `components/composition-panel.tsx` | Automatic composition, optional section arrangement and balance |
+| `components/composer.tsx` | Studio, transport, library, instrument changes and export |
 
-Piano samples are bundled locally (17 minor-third-spaced samples, C2–C6, about 1.3 MB). No third-party sound CDN is needed at runtime. The app requires loading its page/assets before use; an installable/offline-cached PWA is not part of this MVP.
+The `MusicalIntent` layer separates human input from instrument performance. Tempo changes scale playback without rewriting source timing. Playback, WAV/MP3 and MIDI use the same arrangement, section membership and mix choices. Regeneration replaces suggested backing while retaining original ideas and manual structure.
 
-The `MusicalIntent` abstraction preserves pitches, confidence, timing, duration, intensity and source independently of arranged events. A first track's leading silence is trimmed in intent coordinates; original PCM stays untouched. Later tracks retain their initial offset. Future analyzers and instruments can replace isolated modules.
+The initial music brain uses local DSP, chord scoring and instrument rules, following the plan's rules-before-training approach. There is no neural transcription, trained composer or generative cloud render. Those remain optional future enhancements; the tap/hum-to-song flow already works without them.
 
-## Verification
+Four sample banks are bundled locally: grand piano, electric bass, acoustic guitar and violin-based strings, about 3.3 MB in total. Drums and synth are generated. No third-party sound CDN is required during playback. Assets must load first; an installable, offline-cached PWA is not included.
 
-`npm run check` runs strict TypeScript, application lint, and 15 automated tests. Tests cover six wobbly synthetic hummed notes, common sample rates, low/high pitches, silence/DC/noise rejection, tap onsets/accents, tempo, soft timing, smoothing reversibility, WAV headers, IndexedDB round trips with original blobs, capture timing/release/limits, real sampled stereo rendering, and successful WAV/MP3 decoding. Audio rendering tests use a native Web Audio implementation without needing a microphone or speakers.
+## Verification and practical limits
 
-The untouched generated Shadcn catalog and its generated mobile hook are excluded from application lint because they contain upstream lint violations. They remain type-checked. Application code and tests are linted.
+`npm run check` runs strict TypeScript, application lint, and automated engine, persistence, audio and component interaction tests. Coverage includes pitch/noise/tap fixtures, all instrument/input combinations, automatic structure and variations, preservation of manual edits, tempo scaling, entrances/repeat/register, seek/repeat scheduling, backup import validation, MIDI, undo, original-audio persistence, sample decoding, bounded stereo rendering and WAV/MP3 decoding. Component interaction tests exercise arranging and the tap-to-piano keep flow in jsdom. Production output is built and checked through HTTP requests.
 
-The automated tests establish engine behavior, not subjective quality on every real microphone. Real-voice, device, touch-browser, screen-reader, and permission-dialog testing remains a release acceptance step. Humming should be monophonic and reasonably clear. YIN is a deterministic prototype, not Basic Pitch/CREPE or a trained vocal model. Pitch ambiguity, noisy rooms, breathy voices, and speaker bleed can reduce accuracy. The tempo/key estimator is intentionally conservative and does not infer chord progressions in this version.
+The untouched generated Shadcn catalog and its generated mobile hook are excluded from application lint because of upstream lint violations. They remain typechecked; application code and tests are linted.
 
-Songs live only in this browser's IndexedDB. Clearing site data or changing browsers/origins does not migrate songs. Storage failures remain visible; audio/original downloads provide an immediate way to preserve work. MP3/WAV are rendered audio, not editable project backups.
+Automated verification does not establish subjective musical quality or microphone behavior across real devices. Humming is monophonic; pitch ambiguity, noisy rooms, breathy voices and speaker bleed can reduce accuracy. Beatboxing sound classification, polyphonic transcription, arbitrary audio imports and professional plugin hosting are not implemented. Device microphone, touch-browser and screen-reader evaluation remain valuable user testing.
 
-## Next milestones from the plan
+Songs live in this browser's IndexedDB. Clearing site data or switching origins does not carry songs over. Use **Save project** and **Open project** to preserve or transfer editable songs. Storage failures remain visible, and original recordings can be downloaded separately.
 
-1. Test the “six ugly notes, then desk taps” interaction with non-musicians on real devices. Benchmark YIN against Basic Pitch / CREPE using consented recordings.
-2. V0.2: bass and guitar arrangers; better project-level key/chord inference.
-3. V0.3: strings, synth, and changing instrument without another recording.
-4. Expand smoothing and accompaniment while preserving the simple interface.
-5. Only after the instant workflow is useful: opt-in feedback data, symbolic models, and an optional generative render. No training-data collection or heavy generative feature is implemented here.
-
-## Sound licenses
-
-See [`THIRD_PARTY_NOTICES.md`](./THIRD_PARTY_NOTICES.md). The in-app credits provide the same sample attribution and privacy explanation.
+See [THIRD_PARTY_NOTICES.md](./THIRD_PARTY_NOTICES.md) for sound and encoder attribution.

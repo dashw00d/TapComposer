@@ -1,8 +1,22 @@
 'use client';
-import { useEffect, useRef, useState } from 'react';
+import {
+  createElement,
+  useEffect,
+  useEffectEvent,
+  useRef,
+  useState,
+} from 'react';
 import Link from 'next/link';
 import {
   AudioLines,
+  Guitar,
+  Music2,
+  Waves,
+  Undo2,
+  Redo2,
+  SlidersHorizontal,
+  Upload,
+  Copy,
   ArrowUpRight,
   Check,
   Download,
@@ -15,7 +29,6 @@ import {
   Piano,
   Play,
   Plus,
-  RotateCcw,
   Sparkles,
   Square,
   Trash2,
@@ -29,6 +42,26 @@ import {
   DialogDescription,
   DialogTitle,
 } from '@/components/ui/dialog';
+import { Slider } from '@/components/ui/slider';
+import {
+  Select,
+  SelectTrigger,
+  SelectContent,
+  SelectItem,
+  SelectValue,
+} from '@/components/ui/select';
+import { CompositionPanel, MixControls } from './composition-panel';
+import { useSongHistory } from '@/hooks/use-song-history';
+import { INSTRUMENTS, instrumentInfo } from '@/lib/music/instruments';
+import {
+  composeSong,
+  arrangedTracks,
+  patternTracks,
+  changeInstrument,
+  keepIdea,
+} from '@/lib/music/composition';
+import { exportProject, importProject } from '@/lib/music/project';
+import { exportMidi } from '@/lib/music/midi';
 import { Switch } from '@/components/ui/switch';
 import { AudioEngine } from '@/lib/music/audio';
 import { microphoneError } from '@/lib/music/capture';
@@ -55,7 +88,13 @@ import {
 import { Recorder } from './recorder';
 
 export default function Composer() {
-  const [song, setSong] = useState<Song | null>(null);
+  const history = useSongHistory();
+  const { song, load: loadSong } = history;
+  const [view, setView] = useState<'song' | 'ideas'>('song');
+  const [mixOpen, setMixOpen] = useState(false);
+  const [seekAt, setSeekAt] = useState(0);
+  const [seekDraft, setSeekDraft] = useState<number | null>(null);
+  const projectInput = useRef<HTMLInputElement | null>(null);
   const [saveState, setSaveState] = useState('Opening your songs…');
   const [error, setError] = useState('');
   const [recorder, setRecorder] = useState<{
@@ -65,14 +104,11 @@ export default function Composer() {
   const [playing, setPlaying] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [progress, setProgress] = useState(0);
+  const [playedDuration, setPlayedDuration] = useState(0);
   const [library, setLibrary] = useState<Song[] | null>(null);
   const [exportOpen, setExportOpen] = useState(false);
   const [exporting, setExporting] = useState(false);
   const [detailId, setDetailId] = useState<string | null>(null);
-  const [deleted, setDeleted] = useState<{
-    track: Track;
-    index: number;
-  } | null>(null);
   const [credits, setCredits] = useState(false);
   const [audioEngine] = useState(() => new AudioEngine());
   const playback = useRef<{ startAt: number; duration: number } | null>(null);
@@ -88,11 +124,11 @@ export default function Composer() {
     mounted.current = true;
     listSongs()
       .then((songs) => {
-        if (mounted.current) setSong(songs[0] ?? newSong());
+        if (mounted.current) loadSong(songs[0] ?? newSong());
       })
       .catch(() => {
         if (mounted.current) {
-          setSong(newSong());
+          loadSong(newSong());
           setError(
             'Browser storage is unavailable. You can still play, but download your recordings before leaving.',
           );
@@ -103,6 +139,8 @@ export default function Composer() {
       exportWorker.current?.terminate();
       void audioEngine.close();
     };
+    // Initial load uses the history reducer dispatch.
+    // oxlint-disable-next-line react-hooks/exhaustive-deps
   }, [audioEngine]);
   useEffect(() => {
     if (!song) return;
@@ -140,7 +178,35 @@ export default function Composer() {
   }, [playing, audioEngine]);
   function updateSong(change: (song: Song) => Song) {
     setSaveState('Saving…');
-    setSong((s) => (s ? { ...change(s), updatedAt: Date.now() } : s));
+    if (song) {
+      stop();
+      history.edit(change(song));
+    }
+  }
+  function updateMusic(change: (song: Song) => Song) {
+    if (!song) return;
+    const current = playback.current;
+    const oldBeat = 60 / (song.context?.tempo ?? 100);
+    const at = current
+      ? Math.max(
+          0,
+          (audioEngine.currentTime - current.startAt) % current.duration,
+        )
+      : 0;
+    const next = change(song);
+    const resume = playing === 'all';
+    updateSong(() => next);
+    if (resume) {
+      const prepared =
+        view === 'song' ? arrangedTracks(next) : patternTracks(next);
+      const nextAt = ((at / oldBeat) * 60) / (next.context?.tempo ?? 100);
+      void play(
+        prepared,
+        'all',
+        Math.min(nextAt, Math.max(0, songDuration(prepared) - 0.1)),
+        true,
+      );
+    }
   }
   function stop() {
     playSerial.current++;
@@ -150,12 +216,18 @@ export default function Composer() {
     playback.current = null;
     setProgress(0);
   }
-  async function play(tracks: Track[], id: string) {
-    if (playing === id) {
+  async function play(
+    tracks: Track[],
+    id: string,
+    offset = 0,
+    restart = false,
+  ) {
+    if (!restart && playing === id && offset === 0) {
       stop();
       return;
     }
     stop();
+    setSeekAt(offset);
     const token = playSerial.current;
     setError('');
     setLoading(true);
@@ -166,9 +238,12 @@ export default function Composer() {
         () => {
           if (mounted.current) setPlaying(null);
         },
+        undefined,
+        offset,
       );
       if (token !== playSerial.current || !mounted.current) return;
       playback.current = p;
+      setPlayedDuration(p?.duration ?? 0);
       setPlaying(p ? id : null);
     } catch (e) {
       if (token === playSerial.current) setError(microphoneError(e));
@@ -180,7 +255,7 @@ export default function Composer() {
     if (!song) return;
     if (!replaceId && song.tracks.length >= MAX_TRACKS) {
       setError(
-        'This song has 12 parts. Remove one or start a new song to add more.',
+        'This song has 24 parts. Remove one or start a new song to add more.',
       );
       return;
     }
@@ -189,15 +264,9 @@ export default function Composer() {
     setRecorder({ instrument, replaceId });
   }
   function keep(track: Track, context: NonNullable<Song['context']>) {
-    updateSong((s) => ({
-      ...s,
-      context,
-      tracks: s.tracks.some((t) => t.id === track.id)
-        ? s.tracks.map((t) => (t.id === track.id ? track : t))
-        : [...s.tracks, track],
-    }));
+    updateSong((s) => keepIdea(s, track, context));
     setRecorder(null);
-    setDeleted(null);
+    setView('song');
   }
   function patchTrack(id: string, change: (track: Track) => Track) {
     stop();
@@ -222,9 +291,10 @@ export default function Composer() {
     setError('');
     try {
       let blob: Blob;
-      if (format === 'wav') blob = await getEngine().exportWav(song.tracks);
+      if (format === 'wav')
+        blob = await getEngine().exportWav(arrangedTracks(song));
       else {
-        const buffer = await getEngine().render(song.tracks);
+        const buffer = await getEngine().render(arrangedTracks(song));
         const left = buffer.getChannelData(0).slice(),
           right = buffer.getChannelData(1).slice();
         blob = await new Promise<Blob>((resolve, reject) => {
@@ -312,18 +382,88 @@ export default function Composer() {
       muted: false,
       smoother: false,
     };
-    updateSong((s) => ({ ...s, context, tracks: [piano, drums] }));
-    void play([piano, drums], 'all');
+    const composed = composeSong({ ...song, context, tracks: [piano, drums] });
+    updateSong(() => composed);
+    void play(arrangedTracks(composed), 'all');
   }
   const tracks = song?.tracks ?? [],
-    duration = songDuration(tracks),
     detail = tracks.find((t) => t.id === detailId);
-  const canPlay = tracks.some((t) => !t.muted);
+  const transportTracks = song
+    ? view === 'song'
+      ? arrangedTracks(song)
+      : patternTracks(song)
+    : [];
+  const duration = songDuration(transportTracks),
+    canPlay = transportTracks.some((t) => !t.muted && t.events.length);
+  const position = playing ? progress * playedDuration : seekAt;
+  const icons = {
+    piano: Piano,
+    drums: Drum,
+    bass: Music2,
+    guitar: Guitar,
+    strings: Waves,
+    synth: AudioLines,
+  };
+  async function projectDownload() {
+    if (!song) return;
+    try {
+      download(
+        await exportProject(song),
+        `${safeFilename(song.name)}.tapcomposer.json`,
+      );
+    } catch (e) {
+      setError(microphoneError(e));
+    }
+  }
+  async function projectUpload(file: File) {
+    try {
+      const imported = await importProject(file);
+      stop();
+      loadSong(imported);
+      setLibrary(null);
+    } catch (e) {
+      setError(microphoneError(e));
+    }
+  }
+  const keyboard = useEffectEvent((event: KeyboardEvent) => {
+    const target = event.target as HTMLElement;
+    if (
+      target.closest(
+        'input,textarea,select,[role="dialog"],[role="slider"],[contenteditable="true"]',
+      )
+    )
+      return;
+    if (
+      event.code === 'Space' &&
+      !event.repeat &&
+      !target.closest('button,a,[role="button"]')
+    ) {
+      event.preventDefault();
+      void play(transportTracks, 'all');
+    }
+    if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'z') {
+      event.preventDefault();
+      stop();
+      if (event.shiftKey) history.redo();
+      else history.undo();
+    }
+    if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 's') {
+      event.preventDefault();
+      void projectDownload();
+    }
+    if (event.key === 'Escape') stop();
+  });
+  useEffect(() => {
+    const listener = (event: KeyboardEvent) => keyboard(event);
+    window.addEventListener('keydown', listener);
+    return () => window.removeEventListener('keydown', listener);
+  }, []);
   return (
     <div className="app-shell">
       <header className="topbar">
         <Link className="brand" href="/">
-          <AudioLines /> TapComposer<span className="edition">EARLY PLAY</span>
+          <AudioLines /> TapComposer
+          <span className="edition">YOUR LITTLE STUDIO</span>
         </Link>
         <div className="topbar-actions">
           <output className="local-status">
@@ -339,12 +479,12 @@ export default function Composer() {
           </button>
         </div>
       </header>
-      <main className="workspace">
+      <main className="workspace studio-workspace">
         <div className="intro">
           <div>
             <p className="eyebrow">A LITTLE MUSIC, ALL YOURS</p>
-            <h1>Make something.</h1>
-            <p>Hum a melody. Tap a rhythm. See where it goes.</p>
+            <h1>A song starts with you.</h1>
+            <p>Tap or hum an idea. We’ll help it become a song.</p>
           </div>
           <span className="intro-note">
             No wrong notes.
@@ -360,37 +500,32 @@ export default function Composer() {
             </button>
           </div>
         )}
-        <section className="instrument-grid" aria-label="Choose an instrument">
-          <button
-            className="instrument-card piano"
-            disabled={!song}
-            onClick={() => openRecorder('piano')}
-          >
-            <div className="instrument-top">
-              <Piano />
-              <ArrowUpRight />
-            </div>
-            <h2>Piano</h2>
-            <p>Turn a hum into a melody.</p>
-            <span className="card-action">
-              Hum something <Plus size={18} />
-            </span>
-          </button>
-          <button
-            className="instrument-card drums"
-            disabled={!song}
-            onClick={() => openRecorder('drums')}
-          >
-            <div className="instrument-top">
-              <Drum />
-              <ArrowUpRight />
-            </div>
-            <h2>Drums</h2>
-            <p>There’s a beat in your fingertips.</p>
-            <span className="card-action">
-              Tap something <Plus size={18} />
-            </span>
-          </button>
+        <section
+          className="instrument-grid studio-instruments"
+          aria-label="Choose an instrument"
+        >
+          {INSTRUMENTS.map((instrument) => {
+            const Icon = icons[instrument.id];
+            return (
+              <button
+                key={instrument.id}
+                className={`instrument-card ${instrument.id}`}
+                style={{ background: instrument.color }}
+                disabled={!song}
+                onClick={() => openRecorder(instrument.id)}
+              >
+                <div className="instrument-top">
+                  <Icon />
+                  <Plus size={17} />
+                </div>
+                <h2>{instrument.name}</h2>
+                <p>{instrument.description}</p>
+                <span className="card-action">
+                  Tap or hum <ArrowUpRight size={15} />
+                </span>
+              </button>
+            );
+          })}
         </section>
         <section className="song-section" aria-label="Your song">
           <div className="section-heading">
@@ -416,7 +551,7 @@ export default function Composer() {
             <button
               className="button primary"
               disabled={!canPlay || loading}
-              onClick={() => play(tracks, 'all')}
+              onClick={() => play(transportTracks, 'all')}
             >
               {loading ? (
                 <LoaderCircle className="spin" size={18} />
@@ -429,9 +564,114 @@ export default function Composer() {
                 ? 'Getting ready…'
                 : playing === 'all'
                   ? 'Stop playing'
-                  : 'Play everything'}
+                  : view === 'song'
+                    ? 'Play my song'
+                    : 'Play my ideas'}
             </button>
           </div>
+          <div className="studio-toolbar">
+            <div className="view-buttons">
+              <button
+                aria-pressed={view === 'song'}
+                onClick={() => {
+                  stop();
+                  setSeekAt(0);
+                  setView('song');
+                }}
+              >
+                The song
+              </button>
+              <button
+                aria-pressed={view === 'ideas'}
+                onClick={() => {
+                  stop();
+                  setSeekAt(0);
+                  setView('ideas');
+                }}
+              >
+                The ingredients
+              </button>
+            </div>
+            <div className="history-actions">
+              <button
+                className="icon-button"
+                aria-label="Undo"
+                title="Undo · Ctrl/⌘ Z"
+                disabled={!history.canUndo}
+                onClick={() => {
+                  stop();
+                  history.undo();
+                }}
+              >
+                <Undo2 size={19} />
+              </button>
+              <button
+                className="icon-button"
+                aria-label="Redo"
+                title="Redo · Ctrl/⌘ Shift Z"
+                disabled={!history.canRedo}
+                onClick={() => {
+                  stop();
+                  history.redo();
+                }}
+              >
+                <Redo2 size={19} />
+              </button>
+              <button
+                className="button"
+                disabled={!tracks.length}
+                onClick={() => setMixOpen(!mixOpen)}
+              >
+                <SlidersHorizontal size={17} /> Balance
+              </button>
+            </div>
+          </div>
+          {tracks.length > 0 && (
+            <div className="transport-line">
+              <span>
+                {Math.floor(position / 60)}:
+                {String(Math.floor(position % 60)).padStart(2, '0')}
+              </span>
+              <Slider
+                aria-label="Playback position"
+                value={[
+                  seekDraft ?? (duration ? (position / duration) * 100 : 0),
+                ]}
+                onValueChange={(value) =>
+                  setSeekDraft(Array.isArray(value) ? value[0] : value)
+                }
+                min={0}
+                max={100}
+                onValueCommitted={(value) => {
+                  setSeekDraft(null);
+                  const offset =
+                    ((Array.isArray(value) ? value[0] : value) / 100) *
+                    duration;
+                  void play(
+                    transportTracks,
+                    'all',
+                    Math.min(offset, Math.max(0, duration - 0.1)),
+                    true,
+                  );
+                }}
+              />
+              <span>
+                {Math.floor(duration / 60)}:
+                {String(Math.floor(duration % 60)).padStart(2, '0')}
+              </span>
+            </div>
+          )}
+          {song && tracks.length > 0 && view === 'song' && (
+            <CompositionPanel
+              song={song}
+              update={updateMusic}
+              onSeek={(seconds) =>
+                void play(arrangedTracks(song), 'all', seconds, true)
+              }
+              position={position}
+            />
+          )}
+          {song && mixOpen && <MixControls song={song} update={updateMusic} />}
           {tracks.length === 0 ? (
             <div className="empty-song">
               <AudioLines size={38} />
@@ -447,7 +687,7 @@ export default function Composer() {
             </div>
           ) : (
             <>
-              <div className="track-list">
+              <div className="track-list studio-track-list">
                 {tracks.map((track) => (
                   <div
                     key={track.id}
@@ -455,16 +695,24 @@ export default function Composer() {
                   >
                     <button
                       className={`track-icon ${track.instrument}`}
+                      style={{
+                        background: instrumentInfo(track.instrument).color,
+                      }}
                       aria-label={`Listen to ${track.name}`}
                       disabled={track.muted || loading}
-                      onClick={() => play([track], track.id)}
+                      onClick={() =>
+                        play(
+                          song
+                            ? patternTracks({ ...song, tracks: [track] })
+                            : [track],
+                          track.id,
+                        )
+                      }
                     >
                       {playing === track.id ? (
                         <Square size={20} />
-                      ) : track.instrument === 'piano' ? (
-                        <Piano size={24} />
                       ) : (
-                        <Drum size={24} />
+                        createElement(icons[track.instrument], { size: 24 })
                       )}
                     </button>
                     <div className="track-info">
@@ -475,11 +723,13 @@ export default function Composer() {
                         {track.name}
                       </button>
                       <span>
-                        {track.intent.source === 'hum'
-                          ? 'Your melody'
-                          : track.intent.source === 'touch'
-                            ? 'Your taps'
-                            : 'Your rhythm'}
+                        {track.generated
+                          ? 'Arranged for you'
+                          : track.intent.source === 'hum'
+                            ? 'Your melody'
+                            : track.intent.source === 'touch'
+                              ? 'Your taps'
+                              : 'Your rhythm'}
                         {track.smoother ? ' · Smoothed' : ''}
                       </span>
                     </div>
@@ -493,8 +743,8 @@ export default function Composer() {
                           <i
                             key={i}
                             style={{
-                              left: `${(e.time / duration) * 96}%`,
-                              width: `${Math.max(0.8, (e.duration / duration) * 96)}%`,
+                              left: `${(e.time / track.duration) * 96}%`,
+                              width: `${Math.max(0.8, (e.duration / track.duration) * 96)}%`,
                               height:
                                 track.instrument === 'piano'
                                   ? '7px'
@@ -503,10 +753,8 @@ export default function Composer() {
                                 track.instrument === 'piano'
                                   ? `${12 + ((84 - e.note) / 48) * 65}%`
                                   : '25%',
-                              background:
-                                track.instrument === 'piano'
-                                  ? '#c7bdf5'
-                                  : '#f2c276',
+                              background: instrumentInfo(track.instrument)
+                                .color,
                             }}
                           />
                         ))}
@@ -568,23 +816,6 @@ export default function Composer() {
               </div>
             </>
           )}
-          {deleted && (
-            <output className="undo-bar">
-              <span>{deleted.track.name} removed.</span>
-              <button
-                onClick={() => {
-                  updateSong((s) => {
-                    const next = [...s.tracks];
-                    next.splice(deleted.index, 0, deleted.track);
-                    return { ...s, tracks: next };
-                  });
-                  setDeleted(null);
-                }}
-              >
-                <RotateCcw size={15} /> Undo
-              </button>
-            </output>
-          )}
         </section>
         <footer>
           <span>Made by you. A little help from TapComposer.</span>
@@ -593,6 +824,18 @@ export default function Composer() {
           </button>
         </footer>
       </main>
+      <input
+        type="file"
+        ref={projectInput}
+        accept=".json,.tapcomposer.json"
+        className="sr-only"
+        aria-label="Import TapComposer project"
+        onChange={(e) => {
+          const file = e.target.files?.[0];
+          if (file) void projectUpload(file);
+          e.target.value = '';
+        }}
+      />
       {song && recorder && (
         <Recorder
           key={`${recorder.instrument}-${recorder.replaceId ?? 'new'}`}
@@ -618,12 +861,17 @@ export default function Composer() {
             className="button primary full"
             onClick={() => {
               stop();
-              setSong(newSong());
-              setDeleted(null);
+              loadSong(newSong());
               setLibrary(null);
             }}
           >
             <Plus size={18} /> New song
+          </button>
+          <button
+            className="button full"
+            onClick={() => projectInput.current?.click()}
+          >
+            <Upload size={18} /> Open a project file
           </button>
           <div className="saved-songs">
             {library?.map((s) => (
@@ -632,8 +880,7 @@ export default function Composer() {
                 className="saved-song"
                 onClick={() => {
                   stop();
-                  setSong(s);
-                  setDeleted(null);
+                  loadSong(s);
                   setLibrary(null);
                 }}
               >
@@ -671,6 +918,31 @@ export default function Composer() {
             Save one full pass of your song. Only parts with their sound on are
             included.
           </DialogDescription>
+          <button
+            className="export-option"
+            disabled={exporting}
+            onClick={() => void projectDownload()}
+          >
+            <div>
+              <strong>Editable project</strong>
+              <span>Your song, arrangement, and original recordings.</span>
+            </div>
+            <Download />
+          </button>
+          <button
+            className="export-option"
+            disabled={exporting}
+            onClick={() => {
+              if (song)
+                download(exportMidi(song), `${safeFilename(song.name)}.mid`);
+            }}
+          >
+            <div>
+              <strong>MIDI</strong>
+              <span>Take the notes into another music app.</span>
+            </div>
+            <Download />
+          </button>
           <button
             className="export-option"
             disabled={exporting}
@@ -718,6 +990,72 @@ export default function Composer() {
           </DialogDescription>
           {detail && (
             <div className="detail-actions">
+              <label className="field-label" htmlFor="part-name">
+                Name this idea
+              </label>
+              <input
+                id="part-name"
+                className="part-name-input"
+                key={detail.id}
+                defaultValue={detail.name}
+                maxLength={60}
+                onBlur={(e) => {
+                  const name = e.target.value.trim();
+                  if (name && name !== detail.name)
+                    patchTrack(detail.id, (t) => ({ ...t, name }));
+                }}
+              />
+              <Select
+                value={detail.instrument}
+                onValueChange={(value) => {
+                  if (value)
+                    patchTrack(detail.id, (t) =>
+                      changeInstrument(t, value as Instrument, song!.context!),
+                    );
+                }}
+              >
+                <SelectTrigger className="full" aria-label="Change instrument">
+                  <SelectValue>
+                    {instrumentInfo(detail.instrument).name}
+                  </SelectValue>
+                </SelectTrigger>
+                <SelectContent>
+                  {INSTRUMENTS.map((i) => (
+                    <SelectItem key={i.id} value={i.id}>
+                      {i.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <button
+                className="button full"
+                disabled={tracks.length >= MAX_TRACKS}
+                onClick={() => {
+                  const id = crypto.randomUUID();
+                  updateSong((s) => ({
+                    ...s,
+                    tracks: [
+                      ...s.tracks,
+                      {
+                        ...detail,
+                        id,
+                        name: `${detail.name} copy`,
+                        generated: false,
+                      },
+                    ],
+                    sections: s.sections?.map((section) => ({
+                      ...section,
+                      trackIds: section.trackIds.includes(detail.id)
+                        ? [...section.trackIds, id]
+                        : section.trackIds,
+                    })),
+                  }));
+                  setDetailId(id);
+                }}
+              >
+                <Copy size={18} /> Make a copy
+              </button>
+
               <button
                 className="button full"
                 onClick={() => play([detail], detail.id)}
@@ -763,10 +1101,16 @@ export default function Composer() {
                 className="button full danger"
                 onClick={() => {
                   stop();
-                  setDeleted({ track: detail, index: tracks.indexOf(detail) });
+
                   updateSong((s) => ({
                     ...s,
                     tracks: s.tracks.filter((t) => t.id !== detail.id),
+                    sections: s.sections?.map((section) => ({
+                      ...section,
+                      trackIds: section.trackIds.filter(
+                        (id) => id !== detail.id,
+                      ),
+                    })),
                   }));
                   setDetailId(null);
                 }}
@@ -812,7 +1156,18 @@ export default function Composer() {
               , played at adjusted pitches with a little room ambience.
             </p>
             <p>
-              Drum sounds are synthesized in TapComposer. MP3 encoding uses{' '}
+              Drums and synth are generated locally. Bass, guitar, and violin
+              samples are curated by{' '}
+              <a
+                href="https://github.com/nbrosowsky/tonejs-instruments"
+                target="_blank"
+                rel="noreferrer"
+              >
+                Nathan Brosowsky
+              </a>{' '}
+              from Karoryfer, University of Iowa, and VSCO sources (CC BY 3.0).
+              These samples are trimmed and compressed, with pitch adjustment
+              and room ambience. MP3 encoding uses{' '}
               <a
                 href="https://github.com/shijinyu/lamejs"
                 target="_blank"

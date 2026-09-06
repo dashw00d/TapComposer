@@ -15,7 +15,7 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: 'TapComposer — Make a little music',
   description:
-    'Hum a melody. Tap a rhythm. Make a song with piano and drums, right in your browser.',
+    'Tap or hum an idea. TapComposer adds harmony, backing and a song arrangement, with six instruments and room to make it your own.',
 };
 
 export default function RootLayout({

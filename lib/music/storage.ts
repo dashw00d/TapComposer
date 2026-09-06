@@ -42,6 +42,13 @@ export async function listSongs(): Promise<Song[]> {
       resolve(
         (request.result as Song[])
           .filter((s) => s.version === 1)
+          .map((s) => ({
+            ...s,
+            tracks: s.tracks.map((track) => ({
+              ...track,
+              sourceTempo: track.sourceTempo ?? s.context?.tempo ?? 100,
+            })),
+          }))
           .sort((a, b) => b.updatedAt - a.updatedAt),
       );
     };

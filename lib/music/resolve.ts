@@ -1,3 +1,4 @@
+import { chordAt } from './harmony';
 import type {
   MusicalIntent,
   SongContext,
@@ -71,7 +72,7 @@ export function resolveIntent(
   const beat = 60 / context.tempo,
     grid = beat / 2;
   const strength = smoother ? 0.8 : 0.28;
-  const events: PerformanceEvent[] = intent.events.map((e, i) => {
+  const events: PerformanceEvent[] = intent.events.flatMap((e, i) => {
     const raw = Math.max(0, e.time - offset);
     const time = Math.max(
       0,
@@ -99,15 +100,60 @@ export function resolveIntent(
           (a, b) => Math.abs(a - e.pitch!) - Math.abs(b - e.pitch!),
         )[0];
     }
-    return {
-      time,
-      duration: instrument === 'drums' ? 0.16 : clamp(e.duration, 0.08, 8),
-      note: instrument === 'piano' ? clamp(note, 36, 84) : note,
-      velocity: clamp(e.intensity * 0.82 + 0.12, 0.25, 0.95),
-    };
+    if (instrument !== 'drums' && e.pitch === null) {
+      const chord = chordAt(time / beat, context);
+      const notes =
+        instrument === 'bass'
+          ? [chord[i % 4 === 3 ? 2 : 0] - 12]
+          : instrument === 'synth'
+            ? [chord[i % 3] + 12]
+            : chord;
+      return notes.map((pitch, index) => ({
+        time: time + index * (instrument === 'guitar' ? 0.025 : 0.006),
+        duration:
+          (instrument === 'strings'
+            ? 2.8
+            : instrument === 'bass'
+              ? 0.65
+              : 1.3) * beat,
+        note: pitch,
+        velocity: clamp(e.intensity * 0.7 + 0.15, 0.2, 0.9),
+      }));
+    }
+    if (instrument === 'bass') {
+      while (note > 52) note -= 12;
+      while (note < 28) note += 12;
+    }
+    if (instrument === 'guitar') {
+      while (note < 40) note += 12;
+      while (note > 79) note -= 12;
+    }
+    return [
+      {
+        time,
+        duration:
+          instrument === 'drums'
+            ? 0.16
+            : clamp(
+                e.duration * (instrument === 'strings' ? 1.12 : 1),
+                0.08,
+                8,
+              ),
+        note: instrument === 'piano' ? clamp(note, 36, 84) : note,
+        velocity: clamp(e.intensity * 0.82 + 0.12, 0.25, 0.95),
+      },
+    ];
   });
   // A new melodic onset releases the preceding note, avoiding unintended smears.
-  if (instrument === 'piano')
+  if (
+    instrument === 'piano' &&
+    intent.source === 'hum' &&
+    !intent.events.some(
+      (event, index) =>
+        index > 0 &&
+        Math.abs(event.time - intent.events[index - 1].time) < 0.06,
+    )
+  )
     for (let i = 0; i < events.length - 1; i++)
       events[i].duration = Math.min(
         events[i].duration,
@@ -129,7 +175,7 @@ export function smoothTrack(track: Track, context: SongContext): Track {
   const arranged = resolveIntent(
     track.intent,
     track.instrument,
-    context,
+    { ...context, tempo: track.sourceTempo ?? context.tempo },
     !track.smoother,
     true,
   );
