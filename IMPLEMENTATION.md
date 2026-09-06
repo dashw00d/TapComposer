@@ -14,7 +14,7 @@ Acceptance requirements (completion must be supported by working implementation 
 - [x] Quality of life: undo/redo, keyboard shortcuts, safe autosave, project backup/import, original input preservation, clear empty/error states, touch/keyboard access.
 - [x] MP3/WAV full-song exports and portable MIDI export.
 - [x] Existing saved songs migrate without losing original recordings or user patterns.
-- [x] Production build, HTTP runtime verification and 34 automated engine/data/audio/component interaction checks.
+- [x] Production build, HTTP runtime verification and 35 automated engine/data/audio/component interaction checks.
 
 Implemented scope: six input-independent instruments, source-preserving automatic song composition, optional section arrangement, transport, mix, project portability and audio exports. The earlier two-instrument MVP is not the completion criterion.
 

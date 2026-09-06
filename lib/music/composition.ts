@@ -120,7 +120,7 @@ export function composeSong(
   options: Partial<ComposeSettings> = {},
 ): Song {
   const settings = { ...DEFAULT_COMPOSE, ...input.compose, ...options };
-  const originals = input.tracks.filter((t) => !t.generated);
+  let originals = input.tracks.filter((t) => !t.generated);
   if (!originals.length) return input;
   const melodic = originals.find((t) =>
     t.intent.events.some((e) => e.pitch !== null),
@@ -136,6 +136,27 @@ export function composeSong(
       chords: inferHarmony(melodic.intent, sourceContext),
     };
   }
+  // Rhythmic ideas contain no chosen pitches: keep their timing, but let their
+  // chord interpretation follow new melodic context as the song takes shape.
+  originals = originals.map((track) => {
+    if (
+      track.instrument === 'drums' ||
+      track.intent.events.some((e) => e.pitch !== null)
+    )
+      return track;
+    const resolved = resolveIntent(
+      track.intent,
+      track.instrument,
+      { ...context, tempo: track.sourceTempo ?? context.tempo },
+      track.smoother,
+      true,
+    );
+    return {
+      ...track,
+      ...resolved,
+      duration: Math.max(track.duration, resolved.duration),
+    };
+  });
   const song = { ...input, context };
   const beat = beatSeconds(context),
     variation = settings.variation,

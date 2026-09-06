@@ -68,6 +68,34 @@ void test('legacy songs without sections follow speed changes without changing s
   assert.equal(arranged.duration, source.duration * 2);
   assert.equal(arranged.events[1].time, source.events[1].time * 2);
 });
+void test('tapped chords follow a later melody while the original rhythmic intention stays intact', () => {
+  const initial = composeSong(idea('piano', false));
+  const rhythm = initial.tracks[0];
+  const hummed = idea('guitar');
+  const melody = {
+    ...hummed.tracks[0],
+    id: 'new-melody',
+    intent: {
+      ...hummed.tracks[0].intent,
+      events: hummed.tracks[0].intent.events.map((e) => ({
+        ...e,
+        pitch: e.pitch! + 2,
+      })),
+    },
+  };
+  const next = keepIdea(initial, melody, { ...initial.context!, key: 2 });
+  const updated = next.tracks.find((t) => t.id === rhythm.id)!;
+  assert.equal(updated.intent, rhythm.intent);
+  assert.equal(updated.original, rhythm.original);
+  assert.deepEqual(
+    updated.events.map((e) => e.time),
+    rhythm.events.map((e) => e.time),
+  );
+  assert.notDeepEqual(
+    updated.events.map((e) => e.note),
+    rhythm.events.map((e) => e.note),
+  );
+});
 void test('keeping a later idea adds it to the song, while replacement preserves chosen entrances', () => {
   const song = composeSong(idea());
   const second = { ...idea('synth').tracks[0], id: 'second' };
