@@ -691,6 +691,7 @@ export function Recorder({
                 <button
                   className="button"
                   aria-pressed={draft.smoother}
+                  title="Tidy uncertain notes and uneven loudness, then listen. Undo to compare."
                   onClick={() => {
                     const track = smoothTrack(draft, context.current!);
                     setDraft(track);
@@ -698,7 +699,7 @@ export function Recorder({
                   }}
                 >
                   <Sparkles size={17} />
-                  {draft.smoother ? 'Undo smoothing' : 'Make smoother'}
+                  {draft.smoother ? 'Undo cleanup' : 'Clean up my take'}
                 </button>
               </div>
               <button

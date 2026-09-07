@@ -35,7 +35,7 @@ for source in ('baseline-tiny','baseline-heldout'):
             'seconds':elapsed, 'gpuPeakMiB':torch.cuda.max_memory_allocated()/1024**2}
         (out/f'{name}.json').write_text(json.dumps(value))
         print(name,len(result['events']),f'{elapsed:.2f}s',f"{value['gpuPeakMiB']:.0f} MiB",flush=True)
-sources = {name:hashlib.sha256((APP/'inference'/name).read_bytes()).hexdigest() for name in ('voice_engine.py','voice_decode.py')}
+sources = {name:hashlib.sha256((APP/'inference'/name).read_bytes()).hexdigest() for name in ('voice_engine.py','voice_decode.py','voice_conditioning.py')}
 (out/'provenance.json').write_text(json.dumps({'sourceSha256': sources, 'split':split,
  'model':'ROSVOT / RWBD / RMVPE + CREPE full (torchcrepe 0.0.24)',
  'rosvotCommit':'3c8332bf43adae35f6e4d64971862f2f6139b310',

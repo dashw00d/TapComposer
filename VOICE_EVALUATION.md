@@ -2,6 +2,41 @@
 
 Premium recognition now uses a GPU model ensemble and a new note decoder; Free keeps the browser model. This improves measured pitch and note timing on the real vocal bank, but does not establish reliable recognition for every casual hum. No model training or fine-tuning was performed.
 
+## Quiet-input and cleanup update
+
+The app now automatically raises very quiet premium-analysis input into a useful range, removes material DC offset, and bounds amplification/headroom. Healthy-level input bypasses gain correction. This operates on an analysis copy; the saved recording and capture clock remain intact. Free recognition still uses the browser engine.
+
+**Clean up my take** replaces the previous smoothing operation. It selectively absorbs weak short pitch/octave interruptions, preserves confident short notes and repeated syllables, compresses loudness variation, and gently tightens only a clearly established pulse (including triplets). The first onset stays fixed and other timing moves are capped at 18 ms. It does not snap humming into the inferred key. Cleaned monophonic instruments release overlapping tails more quickly, with a faster string attack. Undo restores and auditions the original notes; manual edits and source audio remain protected.
+
+Final results and source hashes: [benchmarks/voice-cleanup.json](./benchmarks/voice-cleanup.json).
+
+| Check | Before | After |
+| --- | ---: | ---: |
+| All 40 clean corpus clips, note F1 at 100 ms | 73.28% | 73.34% |
+| Eight tuning clips at 1/40 amplitude | 45.72% | 72.88% |
+| Eight reserved clips at 1/40 amplitude | 71.75% | 73.65% |
+| Applying cleanup to the same 40 final transcriptions | Old smoothing: 52.00% | New cleanup: 73.34% |
+
+The last row measures the previous button's excessive timing/key changes, **not a new recognition jump from 52% to 73%**. Unprocessed final transcriptions also score 73.34%; the new cleanup preserves this aggregate score. Note metrics do not score loudness, releases or perceived musical quality. The earlier smoothing score is reproduced from its exact piano pitch/onset rules at `7e182fb`.
+
+The quiet tests multiply original samples by 0.025 without altering pitch, timing or reference annotations. Additional 12 dB white-noise and DC-offset checks are recorded in the JSON; results are mixed and there is no claim to general denoising. The same public 30-second recording through the actual client/WAV/HTTP path recovered 47 notes at normal volume and 48 when quiet, with 96.8% note agreement between predictions. This consistency score is separate from human-reference accuracy. Original and replayed normal-volume predictions were identical.
+
+A general spectral filter did not consistently improve noisy clips. Normalizing every take changed otherwise good boundaries. Neither is enabled. The shipped method corrects weak input selectively; strong rumble, background music, clipping and genuinely ambiguous singing remain limitations. Both singer groups have been inspected, so these are regression checks rather than a fresh blind test.
+
+95 app tests, five Python tests, GPU checks (including very quiet humming and noise), a real rendered-audio tail check, and the production build passed. A UI test verifies that cleanup and undo each audition the right version and save the restored notes.
+
+```bash
+../inference/voice-venv/bin/python scripts/benchmark-voice-conditioning.py my-quiet-dev dev
+../inference/voice-venv/bin/python scripts/benchmark-voice-conditioning.py my-quiet-reserved heldout
+npx tsx scripts/score-voice-conditioning.ts my-quiet-dev
+npx tsx scripts/score-voice-conditioning.ts my-quiet-reserved
+../inference/voice-venv/bin/python scripts/benchmark-gpu-voices.py my-final-voices all
+npx tsx scripts/score-gpu-voices.ts my-final-voices
+npx tsx scripts/benchmark-phrase-cleanup.ts my-final-voices my-cleanup
+```
+
+The conditioning runner picks eight evenly spaced IDs from each lexicographically sorted singer group; it runs the exact engine with correction enabled and disabled. All labels must be fresh. Full results stay in ignored local outputs.
+
 ## Premium GPU results — September 7, 2026
 
 | Engine / group | Clips | Pitch recall | Note F1, 100 ms | Note F1, 50 ms |

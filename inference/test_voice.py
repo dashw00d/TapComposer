@@ -4,6 +4,7 @@ import wave
 import numpy as np
 from fastapi import HTTPException
 from voice_decode import decode_notes
+from voice_conditioning import condition_voice
 from voice_server import read_voice
 
 class VoiceTests(unittest.TestCase):
@@ -24,6 +25,19 @@ class VoiceTests(unittest.TestCase):
         pitch=np.repeat([57.,59.,58.],12);level=np.full(36,.1)
         notes=decode_notes(pitch,np.full(36,.9),level,.01,[.12,.24],.36)
         self.assertEqual([n['pitch'] for n in notes],[57,59,58])
+
+    def test_level_correction_keeps_samples_clock_and_source_intact(self):
+        rate=16000; t=np.arange(rate,dtype=np.float32)/rate
+        quiet=(np.sin(t*2*np.pi*220)*.001).astype(np.float32)
+        original=quiet.copy(); corrected=condition_voice(quiet,rate)
+        np.testing.assert_array_equal(quiet,original)
+        self.assertEqual(len(corrected),len(quiet))
+        np.testing.assert_array_equal(np.signbit(corrected[100:-100]),np.signbit(quiet[100:-100]-quiet.mean()))
+        self.assertGreater(np.max(np.abs(corrected)),np.max(np.abs(quiet))*10)
+        healthy=(np.sin(t*2*np.pi*220)*.1).astype(np.float32)
+        np.testing.assert_array_equal(condition_voice(healthy,rate),healthy)
+        np.testing.assert_array_equal(condition_voice(np.zeros(rate,np.float32),rate),np.zeros(rate,np.float32))
+        self.assertLess(np.max(np.abs(condition_voice(np.full(rate,.1,np.float32),rate))),1e-6)
 
     def wav(self, channels=1, count=1600, rate=16000):
         f=io.BytesIO()

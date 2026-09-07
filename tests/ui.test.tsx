@@ -802,3 +802,33 @@ void test('note editor names pitches, guides additions into key and snaps off-gr
     cleanup();
   }
 });
+
+void test('cleanup auditions both versions and restores the saved source notes', async () => {
+  const {saveSong,listSongs}=await import('../lib/music/storage');
+  const aliases=registerHooks({resolve(specifier,context,next){return next(specifier==='next/link'?'vinext/shims/link':specifier,context);}});
+  const {default:Composer}=await import('../components/composer'); aliases.deregister();
+  const song=sample();song.updatedAt=Date.now()+1000;
+  song.tracks[0].events[0].velocity=.35;
+  // Keep source and performance consistent so undo restores the original take.
+  song.tracks[0].intent.events[0].intensity=(.35-.12)/.82;
+  await saveSong(song);localStorage.setItem('tapcomposer-service','free');
+  // oxlint-disable-next-line typescript/unbound-method
+  const oldPlay=AudioEngine.prototype.play;
+  const auditions:Track[][]=[];
+  AudioEngine.prototype.play=async tracks=>{auditions.push(tracks);return {startAt:0,duration:4};};
+  try {
+    render(<Composer/>);
+    await waitFor(()=>assert.ok(screen.getByRole('button',{name:'My melody, bar 1, 4 bars'})));
+    fireEvent.click(screen.getByRole('button',{name:'My melody, bar 1, 4 bars'}));
+    fireEvent.click(screen.getByRole('button',{name:'More options'}));
+    fireEvent.click(screen.getByRole('button',{name:'Clean up this part'}));
+    await waitFor(()=>assert.equal(auditions.length,1));
+    assert.equal(auditions[0][0].smoother,true);
+    await waitFor(()=>assert.ok(!screen.getByRole('button',{name:'Undo cleanup'}).hasAttribute('disabled')));
+    fireEvent.click(screen.getByRole('button',{name:'Undo cleanup'}));
+    await waitFor(()=>assert.equal(auditions.length,2));
+    assert.equal(auditions[1][0].smoother,false);
+    assert.deepEqual(auditions[1][0].events,song.tracks[0].events);
+    await waitFor(async()=>assert.equal((await listSongs()).find(s=>s.id===song.id)!.tracks[0].smoother,false));
+  } finally {cleanup();AudioEngine.prototype.play=oldPlay;localStorage.clear();}
+});

@@ -1221,18 +1221,20 @@ export default function Composer() {
                 <button
                   className="button full"
                   aria-pressed={detail.smoother}
-                  disabled={detail.edited}
+                  disabled={detail.edited || detail.muted || loading}
                   title={
                     detail.edited
                       ? 'Use the note controls to tidy this edited part'
-                      : 'Gently tighten the original timing'
+                      : 'Tidy uncertain notes and uneven loudness, then listen. Undo to compare.'
                   }
-                  onClick={() =>
-                    patchTrack(detail.id, (t) => smoothTrack(t, song!.context!))
-                  }
+                  onClick={() => {
+                    const cleaned = smoothTrack(detail, song!.context!);
+                    patchTrack(detail.id, () => cleaned);
+                    void play([cleaned], detail.id, 0, true);
+                  }}
                 >
                   <Sparkles size={18} />
-                  {detail.smoother ? 'Undo smoothing' : 'Make smoother'}
+                  {detail.smoother ? 'Undo cleanup' : 'Clean up this part'}
                 </button>
                 <button
                   className="button full"

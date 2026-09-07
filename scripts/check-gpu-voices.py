@@ -17,6 +17,7 @@ def hum(notes,duration=3):
   pcm[round(start*rate):round(start*rate)+n]+=sound.astype(np.float32)
  return pcm
 cases={
+ 'very-quiet-hum':hum([(.4,2.2,57)])*.025,
  'silence':np.zeros(rate*3,np.float32),
  'quiet-room-noise':np.random.default_rng(8).normal(0,.003,rate*3).astype(np.float32),
  'held-hum-vibrato':hum([(.4,2.2,57)]),
@@ -33,6 +34,7 @@ assert not results['silence']['events']
 assert not results['quiet-room-noise']['events']
 for name, expected in {
  'held-hum-vibrato':[(.4,57)],
+ 'very-quiet-hum':[(.4,57)],
  'repeated-dums':[(.4,57),(1,57),(1.6,57)],
  'changing-notes':[(.4,57),(.9,60),(1.4,59),(1.9,62)],
 }.items():

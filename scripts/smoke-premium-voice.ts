@@ -4,6 +4,7 @@ import { readFile } from 'node:fs/promises';
 import { readVoiceWav } from './voice-audio';
 import { PremiumAnalysis } from '../lib/music/premium-analysis';
 import { resolveIntent } from '../lib/music/resolve';
+import { noteScore } from './voice-metrics';
 const request: typeof fetch = (url, init) =>
   fetch(
     new URL(
@@ -40,6 +41,26 @@ assert.deepEqual(
   performanceNotes.events.map((e) => e.time),
   first.events.map((e) => e.time),
 );
+const quiet = await client.analyze(
+  pcm.map((value) => value * 0.025),
+  rate,
+  'hum',
+).result;
+const reference = first.events.map((e) => ({
+  time: e.time,
+  duration: e.duration,
+  pitch: Math.round(e.pitch!),
+}));
+const recovered = quiet.events.map((e) => ({
+  time: e.time,
+  duration: e.duration,
+  pitch: Math.round(e.pitch!),
+}));
+const quietConsistency = noteScore(reference, recovered).f1;
+assert.ok(
+  quietConsistency > 0.85,
+  'A quieter copy should recover substantially the same phrase',
+);
 const invalid = await request('/api/premium/transcribe', {
   method: 'POST',
   headers: { 'Content-Type': 'audio/wav' },
@@ -57,6 +78,8 @@ console.log({
   notes: first.events.length,
   seconds,
   repeatable: true,
+  quietNotes: quiet.events.length,
+  quietConsistency,
   timingPreserved: true,
   invalidWav: invalid.status,
   unauthenticated: unauthenticated.status,

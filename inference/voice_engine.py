@@ -11,6 +11,7 @@ import torch.nn.functional as F
 import yaml
 import torchcrepe
 from voice_decode import decode_notes
+from voice_conditioning import condition_voice
 
 MODEL_ROOT = Path(os.environ.get('TAPCOMPOSER_ROSVOT_DIR', Path(__file__).resolve().parents[2] / 'inference' / 'ROSVOT')).resolve()
 sys.path.insert(0, str(MODEL_ROOT))
@@ -56,11 +57,13 @@ class VoiceEngine:
         return model.eval().to(self.device)
 
     @torch.inference_mode()
-    def transcribe(self, pcm, sample_rate, diagnostics=False):
+    def transcribe(self, pcm, sample_rate, diagnostics=False, normalize=True):
         pcm = np.asarray(pcm, dtype=np.float32)
         if pcm.ndim != 1 or sample_rate < 8000 or sample_rate > 192000 or not 0 < len(pcm) / sample_rate <= 30.01 or not np.isfinite(pcm).all():
             raise ValueError('Use a mono recording of at most 30 seconds.')
         duration = len(pcm) / sample_rate
+        if normalize:
+            pcm = condition_voice(pcm, sample_rate)
         result = {'version': 1, 'source': 'hum', 'analyzer': 'rosvot-crepe', 'duration': duration, 'events': [], 'confidence': 0.0}
         if duration < 0.08 or np.max(np.abs(pcm - pcm.mean())) < 0.001:
             return result

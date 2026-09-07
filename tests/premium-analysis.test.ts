@@ -77,7 +77,7 @@ void test('premium sends WAV and preserves the returned capture clock', async ()
   const context = { tempo: 120, key: 0, mode: 'major' as const, confidence: 1 };
   const natural = resolveIntent(result, 'piano', context, false, true);
   assert.equal(natural.events[0].time, 0.137);
-  assert.notEqual(
+  assert.equal(
     resolveIntent(result, 'piano', context, true, true).events[0].time,
     0.137,
   );

@@ -1,4 +1,5 @@
 import { chordAt } from './harmony';
+import { cleanHumIntent } from './phrase-cleanup';
 import type {
   MusicalIntent,
   SongContext,
@@ -69,12 +70,14 @@ export function resolveIntent(
   preserveTiming = false,
 ): { events: PerformanceEvent[]; duration: number } {
   if (!intent.events.length) return { events: [], duration: 0 };
+  if (smoother && intent.source === 'hum' && !preserveTiming)
+    intent = cleanHumIntent(intent, context);
   const offset = preserveOffset ? 0 : intent.events[0].time;
   const beat = 60 / context.tempo,
     grid = beat / 2;
   const strength = preserveTiming
     ? 0
-    : smoother
+    : smoother && intent.source !== 'hum'
       ? 0.8
       : intent.source === 'hum'
         ? 0
@@ -94,7 +97,7 @@ export function resolveIntent(
           : i === 0 || e.intensity > 0.72 || position === 0
             ? 36
             : 42;
-    } else if (smoother && e.confidence < 0.95) {
+    } else if (smoother && intent.source !== 'hum' && e.confidence < 0.95) {
       const scale =
         context.mode === 'major'
           ? [0, 2, 4, 5, 7, 9, 11]
@@ -142,7 +145,7 @@ export function resolveIntent(
           instrument === 'drums'
             ? 0.16
             : clamp(
-                e.duration * (instrument === 'strings' ? 1.12 : 1),
+                e.duration * (instrument === 'strings' && !smoother ? 1.12 : 1),
                 0.08,
                 8,
               ),

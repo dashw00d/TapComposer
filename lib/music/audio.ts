@@ -2,6 +2,7 @@ import type { Instrument, Track } from './types';
 import { songDuration } from './resolve';
 import { encodeWav } from './wav';
 import { seekExpression } from './expression';
+import { noteEnvelope } from './articulation';
 
 const BANKS: Partial<Record<Instrument, number[]>> = {
   piano: Array.from({ length: 17 }, (_, i) => 36 + i * 3),
@@ -183,7 +184,7 @@ export class AudioEngine {
     const drumBuffers = new Map<number, AudioBuffer>();
     const toneBuffers = new Map<Instrument, AudioBuffer>();
     for (const track of tracks.filter((t) => !t.muted))
-      for (const event of track.events) {
+      for (const [index, event] of track.events.entries()) {
         const source = context.createBufferSource(),
           gain = context.createGain();
         const at = startAt + event.time;
@@ -230,19 +231,12 @@ export class AudioEngine {
         }
         gain.gain.setValueAtTime(0, at);
         const amplitude = event.velocity * (track.volume ?? 1);
-        const attack =
-          track.instrument === 'strings'
-            ? Math.min(0.14, event.duration * 0.4)
-            : 0.003;
+        const envelope = noteEnvelope(track, index, release);
+        const { attack, duration } = envelope;
+        release = envelope.release;
         gain.gain.linearRampToValueAtTime(amplitude, at + attack);
-        gain.gain.setValueAtTime(
-          amplitude,
-          at + Math.max(0.01, event.duration),
-        );
-        gain.gain.exponentialRampToValueAtTime(
-          0.0001,
-          at + event.duration + release,
-        );
+        gain.gain.setValueAtTime(amplitude, at + Math.max(0.01, duration));
+        gain.gain.exponentialRampToValueAtTime(0.0001, at + duration + release);
         const pan = context.createStereoPanner();
         pan.pan.value = track.pan ?? 0;
         const expression = context.createGain();
@@ -256,7 +250,7 @@ export class AudioEngine {
         }
         source.connect(gain).connect(expression).connect(pan).connect(master);
         source.start(at);
-        source.stop(at + event.duration + release + 0.01);
+        source.stop(at + duration + release + 0.01);
         if (collect) {
           this.playing.push(source);
           source.onended = () => {

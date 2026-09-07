@@ -2,7 +2,9 @@
 
 The demo uses ROSVOT + RWBD to propose note boundaries, RMVPE to condition those models, and the full CREPE model for acoustic pitch. The decoder aligns note starts to voiced audio, rejects short unstable fragments, and merges boundaries unsupported by a pitch change or volume dip. It retains fractional pitch until instrument resolution and retains the recording clock. CREPE conversion is deterministic: no random cent dithering and no second sigmoid on probabilities.
 
-The existing Free selector (`tapcomposer-service`) bypasses the voice service entirely. Premium requires server entitlement and a healthy voice service; service failure, contention or unavailable GPU falls back to the original browser worker using the unchanged PCM. Taps always use browser analysis. Natural humming is no longer nudged to the timing grid; **Make smoother** remains opt-in.
+Before premium analysis, quiet voices receive bounded gain correction and DC removal without shifting samples. Healthy-level recordings bypass amplification. Source recordings remain unchanged. General noise filtering is not enabled.
+
+The existing Free selector (`tapcomposer-service`) bypasses the voice service entirely. Premium requires server entitlement and a healthy voice service; service failure, contention or unavailable GPU falls back to the original browser worker using the unchanged PCM. Taps always use browser analysis. Natural humming is no longer nudged to the timing grid; **Clean up my take** remains opt-in. Cleanup preserves deliberate short/chromatic notes, evens loudness and limits timing shifts to 18 ms; undo auditions the original notes. Cleaned instruments also use shorter release tails to avoid smearing consecutive notes.
 
 ## Install
 

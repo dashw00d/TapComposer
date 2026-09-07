@@ -296,3 +296,44 @@ void test('a held synth note audibly fades in and out in the actual audio render
     globalThis.OfflineAudioContext = previous;
   }
 });
+
+void test('cleanup reduces the previous note tail in the rendered audio', async () => {
+  const previous = globalThis.OfflineAudioContext;
+  globalThis.OfflineAudioContext =
+    NativeOfflineAudioContext as unknown as typeof OfflineAudioContext;
+  try {
+    const engine = new AudioEngine();
+    const track: Track = {
+      id: 'tail',
+      name: 'Phrase',
+      instrument: 'synth',
+      intent: buildIntent('hum', [], 1),
+      events: [
+        { time: 0, duration: 0.4, note: 57, velocity: 0.7 },
+        { time: 0.4, duration: 0.4, note: 64, velocity: 0 },
+      ],
+      duration: 1,
+      muted: false,
+      smoother: false,
+      original: null,
+    };
+    const before = await engine.render([track]);
+    const after = await engine.render([{ ...track, smoother: true }]);
+    const rms = (buffer: AudioBuffer, a: number, b: number) => {
+      const data = buffer
+        .getChannelData(0)
+        .slice(Math.floor(a * 44100), Math.floor(b * 44100));
+      return Math.sqrt(data.reduce((s, n) => s + n * n, 0) / data.length);
+    };
+    assert.ok(
+      rms(after, 0.52, 0.59) < rms(before, 0.52, 0.59) * 0.5,
+      'Prior pitch should decay substantially before the following note continues',
+    );
+    assert.ok(
+      rms(after, 0.1, 0.3) > rms(before, 0.1, 0.3) * 0.9,
+      'Cleanup must retain the body of the note',
+    );
+  } finally {
+    globalThis.OfflineAudioContext = previous;
+  }
+});
