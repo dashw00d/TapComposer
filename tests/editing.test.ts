@@ -166,3 +166,37 @@ void test('individual note edits preserve source audio, survive changing sound a
   assert.equal(bounded.events[0].note, 0);
   assert.equal(bounded.duration, 120);
 });
+
+void test('magnetic note edits land on the grid and musical keys without rewriting captured pitches', async () => {
+  const { guidedPitch, inSongKey, magneticTime, stepTime, noteName } =
+    await import('../lib/music/cleanup');
+  assert.equal(noteName(61), 'C♯4');
+  for (const mode of ['major', 'minor'] as const)
+    for (let key = 0; key < 12; key++)
+      for (let note = 28; note < 90; note++) {
+        const guided = guidedPitch(note, { key, mode }, 1);
+        assert.ok(inSongKey(guided, { key, mode }));
+        assert.ok(Math.abs(guided - note) <= 1);
+      }
+  assert.equal(guidedPitch(61, { key: 0, mode: 'major' }, 1), 62);
+  assert.equal(guidedPitch(61, { key: 0, mode: 'major' }, -1), 60);
+  assert.equal(magneticTime(0.141, 0.5), 0.125);
+  assert.equal(stepTime(0.141, 0.5, -1), 0.125);
+  assert.equal(stepTime(0.141, 0.5, 1), 0.25);
+});
+void test('explicit musical directions work on protected parts and releasing protection keeps the other parts safe', async () => {
+  const { directPart, setPartProtection } = await import('../lib/music/direct');
+  const song = makeDemoSong();
+  song.tracks[0].pinned = true;
+  song.sections![0].pinned = true;
+  const before = song.tracks[0];
+  const changed = directPart(song, before.id, 'simpler', true);
+  assert.ok(changed.tracks[0].events.length < before.events.length);
+  assert.equal(changed.tracks[0].intent, before.intent);
+  assert.equal(changed.tracks[0].pinned, true);
+  const released = setPartProtection(song, before.id, false);
+  assert.equal(released.tracks[0].pinned, false);
+  assert.equal(released.sections![0].pinned, false);
+  for (const id of song.sections![0].trackIds.filter((id) => id !== before.id))
+    assert.equal(released.tracks.find((t) => t.id === id)!.pinned, true);
+});

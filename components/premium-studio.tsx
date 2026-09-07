@@ -22,7 +22,7 @@ import {
   DialogTitle,
   DialogDescription,
 } from './ui/dialog';
-import { Slider } from './ui/slider';
+import { MusicSlider } from './music-slider';
 import type { AudioEngine } from '@/lib/music/audio';
 import { arrangedTracks } from '@/lib/music/composition';
 import { download, safeFilename } from '@/lib/music/storage';
@@ -320,19 +320,22 @@ export function PremiumStudio({
                     Lower allows more reinterpretation; higher asks the
                     performance to stay closer to your arrangement.
                   </p>
-                  <div className="fidelity-label">
-                    <span>More adventurous</span>
-                    <span>Closer to my song</span>
-                  </div>
-                  <Slider
-                    aria-label="Follow my arrangement"
+                  <MusicSlider
+                    label="Interpretation"
+                    ariaLabel="Follow my arrangement"
+                    value={strength}
                     min={0.5}
                     max={1}
                     step={0.05}
-                    value={[strength]}
-                    onValueChange={(v) =>
-                      setStrength(Array.isArray(v) ? v[0] : v)
+                    format={(value) =>
+                      value < 0.7
+                        ? 'Adventurous'
+                        : value < 0.9
+                          ? 'Balanced'
+                          : 'Close to my song'
                     }
+                    ends={['Explore', 'Follow my song']}
+                    onCommit={setStrength}
                   />
                 </details>
               </div>

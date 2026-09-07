@@ -631,7 +631,7 @@ void test('playlist gestures move and resize audible blocks, while piano-roll ed
     fireEvent.pointerMove(moved, { clientX: 138, clientY: 20 });
     fireEvent.pointerUp(moved, { clientX: 138, clientY: 20 });
     assert.equal(songClips(song)[0].lengthBeats, 12);
-    const note = screen.getByRole('button', { name: /^Note 1, pitch/ });
+    const note = screen.getByRole('button', { name: /^Note 1,/ });
     note.getBoundingClientRect = () => ({
       left: 0,
       right: 70,
@@ -648,7 +648,7 @@ void test('playlist gestures move and resize audible blocks, while piano-roll ed
     fireEvent.pointerUp(note, { clientX: 28, clientY: 22 });
     assert.equal(
       song.tracks[0].events[0].note,
-      original.tracks[0].events[0].note + 1,
+      original.tracks[0].events[0].note + 2,
     );
     assert.equal(
       song.tracks[0].events[0].time,
@@ -689,5 +689,116 @@ void test('playlist gestures move and resize audible blocks, while piano-roll ed
         release,
       );
     else Reflect.deleteProperty(HTMLElement.prototype, 'releasePointerCapture');
+  }
+});
+
+void test('mixer sliders have clear live values and Hear alone selects exactly one audible part', async () => {
+  const { MixControls } = await import('../components/composition-panel');
+  const { arrangedTracks } = await import('../lib/music/composition');
+  let song = sample();
+  song.tracks[0].muted = true;
+  let edits = 0;
+  const update = (change: (song: Song) => Song) => {
+    song = change(song);
+    edits++;
+    view.rerender(<MixControls song={song} update={update} />);
+  };
+  const view = render(<MixControls song={song} update={update} />);
+  try {
+    // jsdom has no layout; Base UI keeps its unmeasured thumb visually hidden.
+    const slider = screen.getByLabelText('My melody volume', {
+      selector: 'input',
+    });
+    fireEvent.keyDown(slider, { key: 'ArrowRight' });
+    fireEvent.keyUp(slider, { key: 'ArrowRight' });
+    assert.equal(song.tracks[0].volume, 1.05);
+    assert.ok(edits <= 1);
+    assert.ok(screen.getByText('105%'));
+    fireEvent.click(
+      screen.getByRole('switch', { name: 'Hear My melody alone' }),
+    );
+    assert.deepEqual(
+      arrangedTracks(song)
+        .filter((t) => !t.muted)
+        .map((t) => t.id),
+      [song.tracks[0].id],
+    );
+    const other = song.tracks[1];
+    fireEvent.click(
+      screen.getByRole('switch', { name: `Hear ${other.name} alone` }),
+    );
+    assert.deepEqual(
+      arrangedTracks(song)
+        .filter((t) => !t.muted)
+        .map((t) => t.id),
+      [other.id],
+    );
+    fireEvent.click(
+      screen.getByRole('switch', { name: `Hear ${other.name} alone` }),
+    );
+    assert.equal(
+      song.tracks.some((t) => t.solo),
+      false,
+    );
+  } finally {
+    cleanup();
+  }
+});
+
+void test('note editor names pitches, guides additions into key and snaps off-grid timing without changing the chosen pitch', async () => {
+  const { NoteCleanup } = await import('../components/note-cleanup');
+  const { inSongKey } = await import('../lib/music/cleanup');
+  const song = sample();
+  let track = {
+    ...song.tracks[0],
+    events: [{ ...song.tracks[0].events[0], time: 0.141, note: 61 }],
+  };
+  const context = {
+    ...song.context!,
+    tempo: 120,
+    key: 0,
+    mode: 'major' as const,
+  };
+  track.sourceTempo = 120;
+  const ui = () => (
+    <NoteCleanup
+      track={track}
+      context={context}
+      onChange={(next) => {
+        track = next;
+        view.rerender(ui());
+      }}
+      onPlay={() => {}}
+      onAudition={() => {}}
+      playing={false}
+      canUndo={false}
+      onUndo={() => {}}
+    />
+  );
+  const view = render(ui());
+  try {
+    const note = screen.getByRole('button', { name: 'Note 1, C♯4, beat 1.28' });
+    fireEvent.keyDown(note, { key: 'ArrowRight' });
+    assert.equal(track.events[0].time, 0.25);
+    assert.equal(
+      track.events[0].note,
+      61,
+      'timing changes preserve a recorded accidental',
+    );
+    fireEvent.keyDown(note, { key: 'ArrowUp' });
+    assert.equal(track.events[0].note, 62);
+    fireEvent.keyDown(note, { key: 'ArrowRight', shiftKey: true });
+    const end = track.events[0].time + track.events[0].duration;
+    assert.ok(Math.abs(end / 0.125 - Math.round(end / 0.125)) < 1e-8);
+    fireEvent.click(screen.getByRole('button', { name: 'Add note' }));
+    assert.ok(inSongKey(track.events.at(-1)!.note, context));
+    assert.ok(
+      Math.abs(
+        track.events.at(-1)!.time / 0.125 -
+          Math.round(track.events.at(-1)!.time / 0.125),
+      ) < 1e-8,
+    );
+  } finally {
+    cleanup();
   }
 });

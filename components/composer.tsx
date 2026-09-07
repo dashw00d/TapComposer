@@ -35,29 +35,19 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { Slider } from '@/components/ui/slider';
-import {
-  Select,
-  SelectTrigger,
-  SelectContent,
-  SelectItem,
-  SelectValue,
-} from '@/components/ui/select';
 import { AudioComparison, type ComparisonSource } from './audio-comparison';
 import { pauseOtherAudio } from '@/lib/music/media';
 import {
   directPart,
+  setPartProtection,
   DIRECTIONS,
   forkDirection,
   originLabel,
 } from '@/lib/music/direct';
 import { CompositionPanel, MixControls } from './composition-panel';
 import { useSongHistory } from '@/hooks/use-song-history';
-import { INSTRUMENTS, instrumentInfo } from '@/lib/music/instruments';
-import {
-  arrangedTracks,
-  changeInstrument,
-  keepIdea,
-} from '@/lib/music/composition';
+import { INSTRUMENTS } from '@/lib/music/instruments';
+import { arrangedTracks, keepIdea } from '@/lib/music/composition';
 import { exportProject, importProject } from '@/lib/music/project';
 import { exportMidi } from '@/lib/music/midi';
 import { Switch } from '@/components/ui/switch';
@@ -81,7 +71,6 @@ import {
   type Track,
 } from '@/lib/music/types';
 import { Recorder } from './recorder';
-import { NoteCleanup } from './note-cleanup';
 import { SongTimeline } from './song-timeline';
 
 export default function Composer() {
@@ -690,7 +679,8 @@ export default function Composer() {
               <button
                 className="button"
                 disabled={!tracks.length}
-                onClick={() => setMixOpen(!mixOpen)}
+                aria-expanded={mixOpen}
+                onClick={() => setMixOpen((open) => !open)}
               >
                 <SlidersHorizontal size={17} /> Volume & balance
               </button>
@@ -1103,59 +1093,10 @@ export default function Composer() {
                     ? 'Composed from your song’s rhythm and harmony.'
                     : 'Your original idea stays available.'}
               </p>
-              <p className="field-label">Instrument · change the sound</p>
-              <Select
-                value={detail.instrument}
-                onValueChange={(value) => {
-                  if (value)
-                    patchTrack(detail.id, (t) =>
-                      changeInstrument(t, value as Instrument, song!.context!),
-                    );
-                }}
-              >
-                <SelectTrigger className="full" aria-label="Change instrument">
-                  <SelectValue>
-                    {instrumentInfo(detail.instrument).name}
-                  </SelectValue>
-                </SelectTrigger>
-                <SelectContent>
-                  {INSTRUMENTS.map((i) => (
-                    <SelectItem key={i.id} value={i.id}>
-                      {i.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <NoteCleanup
-                key={detail.id}
-                track={detail}
-                tempo={song?.context?.tempo}
-                onChange={(next) => patchTrack(detail.id, () => next)}
-                onPlay={() => play([{ ...detail, muted: false }], detail.id)}
-                onAudition={(track, index) => {
-                  const e = track.events[index];
-                  if (e)
-                    void play(
-                      [
-                        {
-                          ...track,
-                          muted: false,
-                          events: [{ ...e, time: 0 }],
-                          duration: e.duration,
-                        },
-                      ],
-                      detail.id,
-                      0,
-                      true,
-                    );
-                }}
-                playing={playing === detail.id}
-                onUndo={() => {
-                  stop();
-                  history.undo();
-                }}
-                canUndo={history.canUndo}
-              />
+              <p className="control-help">
+                Change the sound and notes in the editor below the song. These
+                extra options shape or manage the whole part.
+              </p>
               <details className="gentle-details" open={detail.generated}>
                 <summary>Change what it plays</summary>
                 <div className="direction-buttons">
@@ -1164,11 +1105,9 @@ export default function Composer() {
                       key={direction.id}
                       className="button"
                       disabled={
-                        detail.pinned ||
-                        !!song?.sections?.some(
-                          (s) => s.pinned && s.trackIds.includes(detail.id),
-                        ) ||
-                        (direction.id === 'later' && !song?.sections?.length) ||
+                        (direction.id === 'later' &&
+                          !song?.sections?.length &&
+                          !song?.clips?.length) ||
                         (direction.id === 'answer' &&
                           !song?.tracks.some(
                             (t) =>
@@ -1181,7 +1120,7 @@ export default function Composer() {
                         if (song)
                           propose(
                             direction.label,
-                            directPart(song, detail.id, direction.id),
+                            directPart(song, detail.id, direction.id, true),
                           );
                       }}
                     >
@@ -1189,38 +1128,28 @@ export default function Composer() {
                     </button>
                   ))}
                 </div>
-                {song?.sections?.some(
-                  (s) => s.pinned && s.trackIds.includes(detail.id),
-                ) && (
-                  <p>
-                    This part belongs to a kept section. Release that section to
-                    try a direction.
-                  </p>
-                )}
-                {detail.pinned && (
-                  <button
-                    className="text-button"
-                    onClick={() =>
-                      patchTrack(detail.id, (t) => ({ ...t, pinned: false }))
-                    }
-                  >
-                    Release this part to try a direction
-                  </button>
-                )}
+                <p className="control-help">
+                  Hear a preview before keeping a change. You can always Undo.
+                </p>
               </details>
               <details className="gentle-details">
                 <summary>Sound &amp; other options</summary>
                 <label className="keep-part-option">
                   <Switch
-                    checked={detail.pinned ?? false}
+                    checked={
+                      !!detail.pinned ||
+                      !!song?.sections?.some(
+                        (s) => s.pinned && s.trackIds.includes(detail.id),
+                      )
+                    }
                     onCheckedChange={(pinned) =>
-                      patchTrack(detail.id, (t) => ({ ...t, pinned }))
+                      updateSong((s) => setPartProtection(s, detail.id, pinned))
                     }
                   />{' '}
                   Protect my edits when rearranging
                 </label>
                 <label className="field-label" htmlFor="part-name">
-                  Name this idea
+                  Name this part
                 </label>
                 <input
                   id="part-name"
@@ -1274,7 +1203,7 @@ export default function Composer() {
                     setDetailId(id);
                   }}
                 >
-                  <Copy size={18} /> Make a copy
+                  <Copy size={18} /> Copy this part and its blocks
                 </button>
 
                 <button

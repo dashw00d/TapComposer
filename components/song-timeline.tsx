@@ -133,7 +133,7 @@ export function SongTimeline({
           {song.tracks.map((t) => (
             <div
               key={t.id}
-              className={`playlist-row ${t.muted ? 'lane-muted' : ''}`}
+              className={`playlist-row ${t.muted || (song.tracks.some((part) => part.solo && !part.muted) && !t.solo) ? 'lane-muted' : ''}`}
               style={
                 {
                   '--part-color': instrumentInfo(t.instrument).color,
@@ -149,7 +149,11 @@ export function SongTimeline({
                   <strong>{t.name}</strong>
                   <span>
                     {instrumentInfo(t.instrument).name} ·{' '}
-                    {t.generated ? 'Backing' : 'Your recording'}
+                    {t.solo
+                      ? 'Listening alone'
+                      : t.generated
+                        ? 'Backing'
+                        : 'Your recording'}
                   </span>
                 </button>
                 <button
@@ -417,8 +421,9 @@ export function SongTimeline({
             </button>
           </div>
           <NoteCleanup
-            key={track.id}
+            key={`${track.id}:${track.instrument}`}
             track={track}
+            context={song.context}
             tempo={song.context?.tempo}
             onChange={patchTrack}
             onPlay={() => onPlay(track)}

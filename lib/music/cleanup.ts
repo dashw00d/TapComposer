@@ -58,3 +58,63 @@ export function trimQuietEdges(track: Track): Track {
     edited: true,
   };
 }
+
+const NOTE_NAMES = [
+  'C',
+  'C♯',
+  'D',
+  'D♯',
+  'E',
+  'F',
+  'F♯',
+  'G',
+  'G♯',
+  'A',
+  'A♯',
+  'B',
+];
+export function noteName(note: number, octave = true): string {
+  const pitch = Math.max(0, Math.min(127, Math.round(note)));
+  return NOTE_NAMES[pitch % 12] + (octave ? Math.floor(pitch / 12) - 1 : '');
+}
+export function inSongKey(
+  note: number,
+  context?: { key: number; mode: 'major' | 'minor' } | null,
+): boolean {
+  if (!context) return true;
+  const scale =
+    context.mode === 'minor' ? [0, 2, 3, 5, 7, 8, 10] : [0, 2, 4, 5, 7, 9, 11];
+  return scale.includes((((Math.round(note) - context.key) % 12) + 12) % 12);
+}
+export function guidedPitch(
+  note: number,
+  context?: { key: number; mode: 'major' | 'minor' } | null,
+  direction = 0,
+): number {
+  const pitch = Math.max(0, Math.min(127, Math.round(note)));
+  for (let distance = 0; distance <= 12; distance++) {
+    for (const candidate of direction > 0
+      ? [pitch + distance, pitch - distance]
+      : [pitch - distance, pitch + distance]) {
+      if (candidate >= 0 && candidate <= 127 && inSongKey(candidate, context))
+        return candidate;
+    }
+  }
+  return pitch;
+}
+export function magneticTime(time: number, beat: number): number {
+  return Math.max(0, Math.round(time / (beat / 4)) * (beat / 4));
+}
+export function stepTime(
+  time: number,
+  beat: number,
+  direction: number,
+): number {
+  const grid = beat / 4;
+  return Math.max(
+    0,
+    (direction > 0
+      ? Math.floor(time / grid + 1e-7) + 1
+      : Math.ceil(time / grid - 1e-7) - 1) * grid,
+  );
+}

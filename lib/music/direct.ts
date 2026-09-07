@@ -10,12 +10,21 @@ export const DIRECTIONS: { id: Direction; label: string }[] = [
   { id: 'space', label: 'Leave more space' },
 ];
 const clamp = (n: number, a: number, b: number) => Math.min(b, Math.max(a, n));
-export function directPart(song: Song, id: string, direction: Direction): Song {
+export function directPart(
+  song: Song,
+  id: string,
+  direction: Direction,
+  explicitEdit = false,
+): Song {
   const track = song.tracks.find((t) => t.id === id);
-  if (!track || track.pinned || !song.context) return song;
-  if (song.sections?.some((s) => s.pinned && s.trackIds.includes(id)))
+  if (!track || (track.pinned && !explicitEdit) || !song.context) return song;
+  if (
+    !explicitEdit &&
+    song.sections?.some((s) => s.pinned && s.trackIds.includes(id))
+  )
     return song;
-  if (direction === 'later' && !song.sections?.length) return song;
+  if (direction === 'later' && !song.sections?.length && !song.clips?.length)
+    return song;
   const beat = 60 / (track.sourceTempo ?? song.context?.tempo ?? 100);
   let events = track.events.map((e) => ({ ...e }));
   const starts = [
@@ -129,7 +138,7 @@ export function directPart(song: Song, id: string, direction: Direction): Song {
     sections:
       direction === 'later'
         ? song.sections?.map((s) =>
-            s.pinned
+            s.pinned && !explicitEdit
               ? s
               : {
                   ...s,
@@ -261,4 +270,34 @@ export function originLabel(track: Track): string {
       : track.intent.source === 'hum'
         ? 'Your melody'
         : 'Your rhythm';
+}
+
+/** Releasing a shared part should not silently release the other protected parts. */
+export function setPartProtection(
+  song: Song,
+  id: string,
+  pinned: boolean,
+): Song {
+  const shared = new Set(
+    !pinned
+      ? song.sections
+          ?.filter((s) => s.pinned && s.trackIds.includes(id))
+          .flatMap((s) => s.trackIds)
+      : [],
+  );
+  return {
+    ...song,
+    tracks: song.tracks.map((t) =>
+      t.id === id
+        ? { ...t, pinned }
+        : shared.has(t.id)
+          ? { ...t, pinned: true }
+          : t,
+    ),
+    sections: song.sections?.map((s) =>
+      !pinned && s.pinned && s.trackIds.includes(id)
+        ? { ...s, pinned: false }
+        : s,
+    ),
+  };
 }

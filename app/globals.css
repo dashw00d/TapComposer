@@ -2183,3 +2183,112 @@ footer {
 .has-song .song-section {
   margin-top: 20px;
 }
+.note-guidance {
+  display: flex;
+  gap: 8px 18px;
+  flex-wrap: wrap;
+  margin: 8px 0 12px;
+  color: #b8cfa8;
+  font-size: 11px;
+  line-height: 1.6;
+}
+.note-selection {
+  margin-left: auto;
+  color: #c8d4df;
+  font-variant-numeric: tabular-nums;
+}
+.piano-keys > div {
+  font-size: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+}
+.piano-keys > .outside-key {
+  color: #7c8c98;
+  background: #24313c;
+}
+.piano-ruler .beat-mark {
+  color: #91a4b7;
+  border: 0;
+}
+.pitch-row {
+  position: absolute;
+  left: 0;
+  right: 0;
+  pointer-events: none;
+  background: #070b1055;
+}
+.pitch-row.in-key {
+  background: color-mix(in srgb, var(--part-color, #a7d786) 6%, transparent);
+}
+.piano-note {
+  overflow: hidden;
+  text-align: left;
+}
+.note-name {
+  font-size: 9px;
+  font-weight: 650;
+  color: #15232a;
+  padding-left: 4px;
+  pointer-events: none;
+  white-space: nowrap;
+}
+.music-slider {
+  min-width: 0;
+  width: 100%;
+}
+.music-slider-label {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  color: #c4d1dd;
+  margin-bottom: 12px;
+}
+.music-slider-label output {
+  font-variant-numeric: tabular-nums;
+  color: #e2efbd;
+  font-size: 11px;
+}
+.music-slider-ends {
+  display: flex;
+  justify-content: space-between;
+  color: #879caf;
+  font-size: 10px;
+  margin-top: 9px;
+}
+.mix-row {
+  grid-template-columns: minmax(130px, 1fr) minmax(120px, 1.5fr) minmax(
+      110px,
+      1fr
+    ) 105px;
+  padding: 16px 0;
+}
+.mix-row > span small {
+  display: block;
+  color: #e4bb99;
+  font-size: 10px;
+  margin-top: 4px;
+}
+.master-row .music-slider {
+  max-width: 440px;
+}
+@media (max-width: 720px) {
+  .mix-row {
+    grid-template-columns: 1fr 1fr;
+    gap: 18px;
+  }
+  .mix-row > span {
+    grid-column: 1;
+    grid-row: 1;
+  }
+  .mix-row > label {
+    grid-column: 2;
+    grid-row: 1;
+    justify-self: end;
+  }
+}
+.piano-scroll {
+  max-height: min(60vh, 550px);
+}

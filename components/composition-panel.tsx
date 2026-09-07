@@ -19,6 +19,7 @@ import {
   Trash2,
 } from 'lucide-react';
 import { Slider } from '@/components/ui/slider';
+import { MusicSlider } from './music-slider';
 import { Switch } from '@/components/ui/switch';
 import {
   Select,
@@ -76,6 +77,14 @@ export function CompositionPanel({
   );
   const settings = { ...DEFAULT_COMPOSE, ...song.compose },
     sections = song.sections ?? [];
+  const automaticBacking = song.tracks.filter((t) => t.generated);
+  const allBackingProtected =
+    automaticBacking.length > 0 &&
+    automaticBacking.every(
+      (t) =>
+        t.pinned ||
+        song.sections?.some((s) => s.pinned && s.trackIds.includes(t.id)),
+    );
   const patch = (id: string, change: (section: SongSection) => SongSection) =>
     update((s) => ({
       ...s,
@@ -95,7 +104,7 @@ export function CompositionPanel({
         </div>
         <button
           className="button primary"
-          disabled={!song.tracks.length}
+          disabled={!song.tracks.length || allBackingProtected}
           onClick={() =>
             propose(
               'Another arrangement',
@@ -113,6 +122,12 @@ export function CompositionPanel({
           {sections.length ? 'Try another version' : 'Build my song'}
         </button>
       </div>
+      {allBackingProtected && (
+        <p className="control-help">
+          Your backing is protected. Edit its notes directly, or turn off
+          protection in a part’s More options to try automatic changes.
+        </p>
+      )}
       <details className="arrangement-drawer">
         <summary>Song settings</summary>
         <p className="control-help">
@@ -122,6 +137,7 @@ export function CompositionPanel({
           <div className="feel-choice">
             <label htmlFor="song-feel">The feeling</label>
             <Select
+              disabled={allBackingProtected}
               value={settings.feel}
               onValueChange={(value) => {
                 if (value)
@@ -143,55 +159,43 @@ export function CompositionPanel({
             </Select>
           </div>
           <div className="macro-control">
-            <p className="control-help">
-              Fewer, softer notes ↔ fuller, busier backing
-            </p>
-            <label htmlFor="energy-control">
-              Backing intensity{' '}
-              <span>{Math.round(settings.energy * 100)}%</span>
-            </label>
-            <Slider
-              id="energy-control"
-              aria-label="Song energy"
-              key={`energy-${settings.energy}`}
-              defaultValue={[settings.energy * 100]}
+            <MusicSlider
+              disabled={allBackingProtected}
+              label="Backing intensity"
+              ariaLabel="Song energy"
+              value={settings.energy * 100}
               min={20}
               max={100}
               step={10}
-              onValueCommitted={(value) =>
-                update((s) =>
-                  composeSong(s, {
-                    energy: (Array.isArray(value) ? value[0] : value) / 100,
-                  }),
-                )
+              ends={['Gentle', 'Full & busy']}
+              onCommit={(value) =>
+                update((s) => composeSong(s, { energy: value / 100 }))
               }
             />
+            <p className="control-help">
+              Changes the automatic backing. Your edited notes stay protected.
+            </p>
           </div>
           <div className="macro-control">
-            <p className="control-help">
-              Slower ↔ faster. Moves the whole song together.
-            </p>
-            <label htmlFor="speed-control">
-              Tempo <span>{Math.round(song.context?.tempo ?? 100)} BPM</span>
-            </label>
-            <Slider
-              id="speed-control"
-              aria-label="Song speed"
-              key={`tempo-${song.context?.tempo}`}
-              defaultValue={[song.context?.tempo ?? 100]}
-              min={55}
-              max={170}
-              step={1}
-              onValueCommitted={(value) =>
+            <MusicSlider
+              label="Song speed"
+              ariaLabel="Song speed"
+              value={song.context?.tempo ?? 100}
+              min={40}
+              max={240}
+              format={(value) => `${Math.round(value)} BPM`}
+              ends={['Slower', 'Faster']}
+              onCommit={(tempo) =>
                 update((s) => ({
                   ...s,
                   context: {
                     ...(s.context ?? { key: 0, mode: 'major', confidence: 0 }),
-                    tempo: Array.isArray(value) ? value[0] : value,
+                    tempo,
                   },
                 }))
               }
             />
+            <p className="control-help">The whole song moves together.</p>
           </div>
         </div>
         <details className="gentle-details harmony-keep">
@@ -624,61 +628,67 @@ export function MixControls({
     <div className="mix-panel">
       <h3>Volume &amp; balance</h3>
       <p className="control-help">
-        Level makes each instrument quieter or louder. Balance places it left or
-        right. Solo lets you hear one part on its own.
+        Make each part quieter or louder. Place it left or right, or hear it
+        alone.
       </p>
       {song.tracks.map((track) => (
         <div className="mix-row" key={track.id}>
-          <span>{track.name}</span>
-          <Slider
-            aria-label={`${track.name} level`}
-            key={`${track.id}-volume-${track.volume}`}
-            defaultValue={[(track.volume ?? 1) * 100]}
+          <span>
+            {track.name}
+            {track.muted && <small>Muted in song</small>}
+          </span>
+          <MusicSlider
+            label="Volume"
+            ariaLabel={`${track.name} volume`}
+            value={(track.volume ?? 1) * 100}
             min={0}
             max={150}
             step={5}
-            onValueCommitted={(value) =>
+            ends={['Quiet', 'Loud']}
+            onCommit={(value) =>
               update((s) => ({
                 ...s,
                 tracks: s.tracks.map((t) =>
-                  t.id === track.id
-                    ? {
-                        ...t,
-                        volume: (Array.isArray(value) ? value[0] : value) / 100,
-                      }
-                    : t,
+                  t.id === track.id ? { ...t, volume: value / 100 } : t,
                 ),
               }))
             }
           />
-          <Slider
-            aria-label={`${track.name} left right balance`}
-            key={`${track.id}-pan-${track.pan}`}
-            defaultValue={[track.pan ?? 0]}
+          <MusicSlider
+            label="Position"
+            ariaLabel={`${track.name} left right balance`}
+            value={track.pan ?? 0}
             min={-1}
             max={1}
             step={0.1}
-            onValueCommitted={(value) =>
+            format={(value) =>
+              Math.abs(value) < 0.05
+                ? 'Center'
+                : `${Math.round(Math.abs(value) * 100)}% ${value < 0 ? 'left' : 'right'}`
+            }
+            ends={['Left', 'Right']}
+            onCommit={(pan) =>
               update((s) => ({
                 ...s,
                 tracks: s.tracks.map((t) =>
-                  t.id === track.id
-                    ? { ...t, pan: Array.isArray(value) ? value[0] : value }
-                    : t,
+                  t.id === track.id ? { ...t, pan } : t,
                 ),
               }))
             }
           />
-          <label htmlFor={`solo-${track.id}`}>
-            Only this{' '}
+          <label>
+            Hear <span className="sr-only">{track.name}</span> alone{' '}
             <Switch
-              id={`solo-${track.id}`}
               checked={track.solo ?? false}
               onCheckedChange={(solo) =>
                 update((s) => ({
                   ...s,
                   tracks: s.tracks.map((t) =>
-                    t.id === track.id ? { ...t, solo } : t,
+                    t.id === track.id
+                      ? { ...t, solo, muted: solo ? false : t.muted }
+                      : solo
+                        ? { ...t, solo: false }
+                        : t,
                   ),
                 }))
               }
@@ -687,19 +697,14 @@ export function MixControls({
         </div>
       ))}
       <div className="master-row">
-        <label htmlFor="master-volume">Everything</label>
-        <Slider
-          id="master-volume"
-          aria-label="Overall volume"
-          key={`master-${song.masterVolume}`}
-          defaultValue={[(song.masterVolume ?? 0.85) * 100]}
+        <MusicSlider
+          label="Overall volume"
+          value={(song.masterVolume ?? 0.85) * 100}
           min={0}
           max={100}
-          onValueCommitted={(value) =>
-            update((s) => ({
-              ...s,
-              masterVolume: (Array.isArray(value) ? value[0] : value) / 100,
-            }))
+          ends={['Quiet', 'Loud']}
+          onCommit={(value) =>
+            update((s) => ({ ...s, masterVolume: value / 100 }))
           }
         />
       </div>

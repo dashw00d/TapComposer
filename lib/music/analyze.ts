@@ -5,17 +5,21 @@ const clamp = (n: number, min: number, max: number) =>
 const median = (a: number[]) =>
   [...a].sort((a, b) => a - b)[Math.floor(a.length / 2)] ?? 0;
 
+function frameLevel(frame: Float32Array): number {
+  let mean = 0,
+    energy = 0;
+  for (const x of frame) mean += x;
+  mean /= frame.length;
+  for (const x of frame) energy += (x - mean) ** 2;
+  return Math.sqrt(energy / frame.length);
+}
+
 /** YIN cumulative mean normalized difference. Reject unvoiced/noisy frames. */
 export function detectPitch(
   frame: Float32Array,
   sampleRate: number,
 ): { pitch: number; confidence: number; rms: number } | null {
-  let energy = 0,
-    mean = 0;
-  for (const x of frame) mean += x;
-  mean /= frame.length;
-  for (const x of frame) energy += (x - mean) ** 2;
-  const rms = Math.sqrt(energy / frame.length);
+  const rms = frameLevel(frame);
   if (rms < 0.009) return null;
   const minTau = Math.floor(sampleRate / 1000),
     maxTau = Math.min(
@@ -74,13 +78,17 @@ export function analyzeHum(
     confidence: number;
     rms: number;
   }[] = [];
-  for (let i = 0; i + frameSize <= pcm.length; i += hop) {
-    const detected = detectPitch(pcm.subarray(i, i + frameSize), rate);
+  // Match the neural path's centered audio clock, including the take's edges.
+  const frame = new Float32Array(frameSize);
+  for (let i = 0; i < pcm.length; i += hop) {
+    for (let j = 0; j < frameSize; j++)
+      frame[j] = pcm[i + j - frameSize / 2] ?? 0;
+    const detected = detectPitch(frame, rate);
     frames.push({
       time: i / rate,
       pitch: detected?.pitch ?? NaN,
       confidence: detected?.confidence ?? 0,
-      rms: detected?.rms ?? 0,
+      rms: detected?.rms ?? frameLevel(frame),
     });
   }
   return humFramesToIntent(frames, hop / rate, input.length / sampleRate);
@@ -97,8 +105,18 @@ export function humFramesToIntent(
   hopSeconds: number,
   duration: number,
 ): MusicalIntent {
-  const smoothed = frames.map((f, i) => {
-    const neighbors = frames
+  // A deep local energy valley is a syllable boundary even when the tracker
+  // can still hear the preceding pitch. Relative levels also work for quiet voices.
+  const gated = frames.map((f, i) => {
+    const nearby = frames.slice(Math.max(0, i - 8), i + 9);
+    const level = median(nearby.map((x) => x.rms));
+    return {
+      ...f,
+      pitch: f.rms < Math.max(0.001, level * 0.22) ? NaN : f.pitch,
+    };
+  });
+  const smoothed = gated.map((f, i) => {
+    const neighbors = gated
       .slice(Math.max(0, i - 2), i + 3)
       .filter((x) => Number.isFinite(x.pitch));
     return {
@@ -109,13 +127,44 @@ export function humFramesToIntent(
           : NaN,
     };
   });
-  const events: IntentEvent[] = [];
-  let group: typeof frames = [];
-  const flush = () => {
+  // Bridge a short loss of pitch only when the voice continues at a healthy
+  // level and returns to the same note. A breath or a long gap stays a rest.
+  for (let i = 1; i < smoothed.length - 1; i++) {
+    if (Number.isFinite(smoothed[i].pitch)) continue;
+    const start = i;
+    while (i < smoothed.length && !Number.isFinite(smoothed[i].pitch)) i++;
+    const before = smoothed[start - 1],
+      after = smoothed[i];
     if (
-      group.length >= 4 &&
-      group[group.length - 1].time - group[0].time >= 0.048
-    ) {
+      !after ||
+      !Number.isFinite(before.pitch) ||
+      (i - start) * hopSeconds > 0.16 ||
+      Math.abs(after.pitch - before.pitch) > 0.65
+    )
+      continue;
+    const floor = Math.max(0.001, Math.min(before.rms, after.rms) * 0.25);
+    if (
+      smoothed.slice(start, i).some((f) => f.rms < floor || f.confidence < 0.15)
+    )
+      continue;
+    for (let j = start; j < i; j++)
+      smoothed[j] = {
+        ...smoothed[j],
+        pitch: (before.pitch + after.pitch) / 2,
+        confidence: Math.min(before.confidence, after.confidence) * 0.8,
+      };
+  }
+  const events: IntentEvent[] = [];
+  let group: PitchFrame[] = [],
+    pending: PitchFrame[] = [];
+  const baseline = () => median(group.slice(-25).map((f) => f.pitch));
+  const absorb = () => {
+    const pitch = baseline();
+    group.push(...pending.map((f) => ({ ...f, pitch })));
+    pending = [];
+  };
+  const flush = () => {
+    if (group.length * hopSeconds >= 0.06) {
       events.push({
         time: group[0].time,
         duration: Math.min(
@@ -123,9 +172,11 @@ export function humFramesToIntent(
           group[group.length - 1].time - group[0].time + hopSeconds,
         ),
         pitch: median(group.map((x) => x.pitch)),
-        confidence: group.reduce((s, x) => s + x.confidence, 0) / group.length,
+        confidence:
+          group.reduce((sum, x) => sum + x.confidence, 0) / group.length,
         intensity: clamp(
-          Math.sqrt(group.reduce((s, x) => s + x.rms, 0) / group.length) * 1.7,
+          Math.sqrt(group.reduce((sum, x) => sum + x.rms, 0) / group.length) *
+            1.7,
           0.2,
           1,
         ),
@@ -135,18 +186,40 @@ export function humFramesToIntent(
   };
   for (const f of smoothed) {
     if (!Number.isFinite(f.pitch)) {
-      if (group.length && f.time - group[group.length - 1].time > 0.064)
+      if (pending.length) absorb();
+      if (group.length && f.time - group[group.length - 1].time >= 0.04 - 1e-8)
         flush();
       continue;
     }
-    if (
-      group.length &&
-      (Math.abs(f.pitch - median(group.slice(-7).map((x) => x.pitch))) > 0.85 ||
-        f.time - group[group.length - 1].time > 0.08)
-    )
+    if (!group.length) {
+      group.push(f);
+      continue;
+    }
+    if (f.time - (pending.at(-1) ?? group.at(-1)!).time > 0.08) {
+      absorb();
       flush();
-    group.push(f);
+      group.push(f);
+      continue;
+    }
+    if (Math.abs(f.pitch - baseline()) <= 0.8) {
+      absorb();
+      group.push(f);
+      continue;
+    }
+    if (
+      pending.length &&
+      Math.abs(f.pitch - median(pending.map((x) => x.pitch))) > 0.6
+    )
+      absorb();
+    pending.push(f);
+    // Confirm a new pitch over several frames, but retain its original onset.
+    if (pending.at(-1)!.time - pending[0].time + hopSeconds >= 0.08 - 1e-8) {
+      flush();
+      group = pending;
+      pending = [];
+    }
   }
+  if (pending.length) absorb();
   flush();
   return buildIntent('hum', events, duration);
 }

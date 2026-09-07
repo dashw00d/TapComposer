@@ -1,11 +1,17 @@
 'use client';
 import { useRef, useState } from 'react';
-import type { PerformanceEvent, Track } from '@/lib/music/types';
+import type { PerformanceEvent, SongContext, Track } from '@/lib/music/types';
 import {
   editNote,
   editNoteGeometry,
+  guidedPitch,
+  inSongKey,
+  magneticTime,
+  noteName,
+  stepTime,
   trimQuietEdges,
 } from '@/lib/music/cleanup';
+
 export function NoteCleanup({
   track,
   onChange,
@@ -15,9 +21,11 @@ export function NoteCleanup({
   onUndo,
   canUndo,
   tempo,
+  context,
 }: {
   track: Track;
   tempo?: number;
+  context?: SongContext | null;
   onChange: (next: Track) => void;
   onPlay: () => void;
   onAudition: (track: Track, index: number) => void;
@@ -31,6 +39,18 @@ export function NoteCleanup({
     event: PerformanceEvent;
   } | null>(null);
   const [page, setPage] = useState(0);
+  const [range] = useState(() => {
+    const low = track.events.length
+      ? Math.min(...track.events.map((e) => e.note))
+      : 60;
+    const high = track.events.length
+      ? Math.max(...track.events.map((e) => e.note))
+      : 71;
+    return {
+      low: Math.max(0, Math.min(low - 4, high - 11)),
+      high: Math.min(127, high + 4),
+    };
+  });
   const gesture = useRef<{
     index: number;
     x: number;
@@ -40,44 +60,95 @@ export function NoteCleanup({
     resize: boolean;
     moved: boolean;
   } | null>(null);
-  const beat = 60 / (track.sourceTempo ?? tempo ?? 100),
+  const drums = track.instrument === 'drums',
+    beat = 60 / (track.sourceTempo ?? tempo ?? 100),
     px = 72,
-    row = track.instrument === 'drums' ? 40 : 18;
+    row = drums ? 40 : 18,
+    keys = 54;
   const bars = 4,
     span = bars * 4 * beat;
   const pageStart =
     Math.min(page, Math.max(0, Math.ceil(track.duration / span) - 1)) * span;
+  const low = Math.min(range.low, ...track.events.map((e) => e.note)),
+    high = Math.max(range.high, ...track.events.map((e) => e.note));
+  const pitches = drums
+    ? [...new Set([42, 38, 36, ...track.events.map((e) => e.note)])].sort(
+        (a, b) => b - a,
+      )
+    : Array.from({ length: high - low + 1 }, (_, i) => high - i);
+  const height = pitches.length * row;
   const notes = track.events
     .map((event, index) => ({ event, index }))
     .filter(
-      ({ event }) => event.time >= pageStart && event.time < pageStart + span,
+      ({ event }) =>
+        event.time + event.duration > pageStart &&
+        event.time < pageStart + span,
     );
-  const lowest = track.events.length
-    ? Math.min(...track.events.map((e) => e.note))
-    : 60;
-  const highest = track.events.length
-    ? Math.max(...track.events.map((e) => e.note))
-    : 71;
-  const high = Math.min(127, highest + 2),
-    low = Math.max(0, Math.min(lowest - 2, high - 11));
-  const pitches =
-    track.instrument === 'drums'
-      ? [...new Set([42, 38, 36, ...track.events.map((e) => e.note)])].sort(
-          (a, b) => b - a,
-        )
-      : Array.from({ length: high - low + 1 }, (_, i) => high - i);
-  const height = pitches.length * row;
+  const pitchLabel = (pitch: number) =>
+    drums
+      ? pitch === 36
+        ? 'Kick'
+        : pitch === 38
+          ? 'Snare'
+          : 'Hi-hat'
+      : noteName(pitch);
   function update(index: number, event: PerformanceEvent) {
     const next = editNoteGeometry(track, index, event);
     onChange(next);
+    if (event.time < pageStart || event.time >= pageStart + span)
+      setPage(Math.floor(event.time / span));
     onAudition(next, index);
+  }
+  function add(time: number, pitch: number) {
+    if (track.events.length >= 10000) return;
+    time = magneticTime(time, beat);
+    if (time >= 119.98) return;
+    const note = drums ? pitch : guidedPitch(pitch, context);
+    const existing = track.events.findIndex(
+      (e) => e.note === note && Math.abs(e.time - time) < 0.001,
+    );
+    if (existing >= 0) {
+      setSelected(existing);
+      onAudition(track, existing);
+      return;
+    }
+    const event = {
+      time,
+      note,
+      duration: Math.min(drums ? beat / 4 : beat, 120 - time),
+      velocity: 0.7,
+    };
+    const next = {
+      ...track,
+      events: [...track.events, event],
+      duration: Math.max(track.duration, time + event.duration),
+      pinned: true,
+      edited: true,
+    };
+    onChange(next);
+    setPage(Math.floor(time / span));
+    setSelected(track.events.length);
+    onAudition(next, track.events.length);
   }
   return (
     <section className="piano-editor" aria-label="Edit notes">
       <div className="piano-toolbar">
-        <strong>{track.name}</strong>
+        <strong>{drums ? 'Drum pattern' : 'Note editor'}</strong>
         <button className="button primary" onClick={onPlay}>
           {playing ? 'Stop' : 'Play part'}
+        </button>
+        <button
+          className="button"
+          onClick={() => {
+            const e = selected !== null ? track.events[selected] : undefined;
+            add(
+              e ? e.time + e.duration : pageStart,
+              e?.note ?? (drums ? 36 : guidedPitch(60, context)),
+            );
+          }}
+          disabled={track.events.length >= 10000}
+        >
+          Add {drums ? 'hit' : 'note'}
         </button>
         <button className="button" onClick={onUndo} disabled={!canUndo}>
           Undo
@@ -91,69 +162,71 @@ export function NoteCleanup({
             setSelected(null);
           }}
         >
-          Delete note
+          Delete {drums ? 'hit' : 'note'}
         </button>
       </div>
       <p>
-        {track.instrument === 'drums'
-          ? 'Drag hits sideways to move them, or up and down to change the drum. Double-click a row to add a hit.'
-          : 'Drag a note up or down to change its pitch. Drag sideways to move it. Pull its right edge to change its length.'}
+        {drums
+          ? 'Drag hits sideways for timing, or up and down to change the drum.'
+          : 'Drag up or down to change the note. Drag sideways for timing. Pull the right edge to make it longer.'}
       </p>
+      <div className="note-guidance">
+        <span>Magnetic timing · ¼ beat</span>
+        {!drums && context && (
+          <span>
+            Notes stay in {noteName(context.key, false)} {context.mode} ·
+            highlighted rows
+          </span>
+        )}
+        <span className="note-selection">
+          {selected !== null && track.events[selected]
+            ? `${pitchLabel(track.events[selected].note)} · beat ${+(track.events[selected].time / beat + 1).toFixed(2)}`
+            : 'Click a note to hear it'}
+        </span>
+      </div>
       <div className="piano-scroll">
         <div
           className="piano-canvas"
-          style={{ width: 44 + bars * 4 * px, height: height + 25 }}
+          style={{ width: keys + bars * 4 * px, height: height + 25 }}
         >
-          <div className="piano-ruler" style={{ left: 44 }}>
-            {Array.from({ length: bars }, (_, i) => (
-              <span key={i} style={{ left: i * 4 * px }}>
-                Bar {Math.round(pageStart / beat / 4) + i + 1}
+          <div className="piano-ruler" style={{ left: keys }}>
+            {Array.from({ length: bars * 4 }, (_, i) => (
+              <span
+                key={i}
+                className={i % 4 === 0 ? 'bar-mark' : 'beat-mark'}
+                style={{ left: i * px }}
+              >
+                {i % 4 === 0
+                  ? `Bar ${Math.round(pageStart / beat / 4) + i / 4 + 1}`
+                  : (i % 4) + 1}
               </span>
             ))}
           </div>
-          <div className="piano-keys" style={{ top: 25 }}>
-            {pitches.map((pitch) => {
-              return (
-                <div
-                  key={pitch}
-                  className={
-                    track.instrument !== 'drums' &&
-                    [1, 3, 6, 8, 10].includes(pitch % 12)
-                      ? 'black-key'
-                      : ''
-                  }
-                  style={{ height: row }}
-                >
-                  {track.instrument === 'drums'
-                    ? pitch === 36
-                      ? 'Kick'
-                      : pitch === 38
-                        ? 'Snare'
-                        : 'Hi-hat'
-                    : pitch % 12 === 0
-                      ? `C${Math.floor(pitch / 12) - 1}`
-                      : ''}
-                </div>
-              );
-            })}
+          <div className="piano-keys" style={{ top: 25, width: keys }}>
+            {pitches.map((pitch) => (
+              <div
+                key={pitch}
+                className={`${!drums && [1, 3, 6, 8, 10].includes(pitch % 12) ? 'black-key' : ''} ${!drums && !inSongKey(pitch, context) ? 'outside-key' : ''}`}
+                style={{ height: row }}
+              >
+                {pitchLabel(pitch)}
+              </div>
+            ))}
           </div>
           <div
             className="piano-grid"
             style={{
-              left: 44,
+              left: keys,
               top: 25,
               width: bars * 4 * px,
               height,
               backgroundSize: `${px / 4}px ${row}px, ${px}px ${row}px, ${px}px ${row}px`,
             }}
             onDoubleClick={(e) => {
-              if (e.target !== e.currentTarget || track.events.length >= 10000)
-                return;
+              if (e.target !== e.currentTarget) return;
               const rect = e.currentTarget.getBoundingClientRect();
-              const time =
-                (Math.round(((e.clientX - rect.left) / px) * 4) / 4) * beat +
-                pageStart;
-              const note =
+              add(
+                ((e.clientX - rect.left) / px) * beat + pageStart,
                 pitches[
                   Math.max(
                     0,
@@ -162,43 +235,35 @@ export function NoteCleanup({
                       Math.floor((e.clientY - rect.top) / row),
                     ),
                   )
-                ];
-              if (time >= 119.98) return;
-              const event = {
-                time,
-                note,
-                duration: Math.min(beat, 120 - time),
-                velocity: 0.7,
-              };
-              const next = {
-                ...track,
-                events: [...track.events, event],
-                duration: Math.max(track.duration, time + event.duration),
-                pinned: true,
-                edited: true,
-              };
-              onChange(next);
-              setSelected(track.events.length);
-              onAudition(next, track.events.length);
+                ],
+              );
             }}
           >
+            {!drums &&
+              context &&
+              pitches.map((pitch, i) => (
+                <div
+                  className={`pitch-row ${inSongKey(pitch, context) ? 'in-key' : ''}`}
+                  aria-hidden="true"
+                  key={pitch}
+                  style={{ top: i * row, height: row }}
+                />
+              ))}
             {notes.map(({ event: original, index }) => {
               const event = draft?.index === index ? draft.event : original;
+              const start = Math.max(event.time, pageStart),
+                end = Math.min(event.time + event.duration, pageStart + span);
               return (
                 <button
                   key={index}
                   className="piano-note"
-                  aria-label={`Note ${index + 1}, pitch ${original.note}, at ${original.time.toFixed(2)} seconds`}
+                  aria-label={`Note ${index + 1}, ${pitchLabel(original.note)}, beat ${+(original.time / beat + 1).toFixed(2)}`}
+                  title={`${pitchLabel(event.note)} · beat ${+(event.time / beat + 1).toFixed(2)}`}
                   aria-pressed={selected === index}
                   style={{
-                    left: ((event.time - pageStart) / beat) * px,
+                    left: ((start - pageStart) / beat) * px,
                     top: pitches.indexOf(event.note) * row + 1,
-                    width: Math.max(
-                      12,
-                      (Math.min(event.duration, pageStart + span - event.time) /
-                        beat) *
-                        px,
-                    ),
+                    width: Math.max(12, ((end - start) / beat) * px),
                     height: row - 2,
                   }}
                   onPointerDown={(e) => {
@@ -221,37 +286,65 @@ export function NoteCleanup({
                   onPointerMove={(e) => {
                     const g = gesture.current;
                     if (!g || g.index !== index) return;
-                    const delta =
-                      (Math.round(((e.clientX - g.x) / px) * 4) / 4) * beat;
-                    const pitch = Math.round((g.y - e.clientY) / row);
-                    g.moved ||=
-                      Math.abs(e.clientX - g.x) > 3 ||
-                      Math.abs(e.clientY - g.y) > 3;
+                    const dx = e.clientX - g.x,
+                      dy = g.y - e.clientY;
+                    g.moved ||= Math.abs(dx) > 3 || Math.abs(dy) > 3;
+                    const pitch =
+                      pitches[
+                        Math.max(
+                          0,
+                          Math.min(
+                            pitches.length - 1,
+                            pitches.indexOf(g.event.note) -
+                              Math.round(dy / row),
+                          ),
+                        )
+                      ];
+                    const time =
+                      !g.resize && Math.abs(dx) > 3
+                        ? Math.max(
+                            0,
+                            Math.min(
+                              119.98,
+                              magneticTime(
+                                g.event.time + (dx / px) * beat,
+                                beat,
+                              ),
+                            ),
+                          )
+                        : g.event.time;
+                    let note =
+                      g.resize || Math.abs(dy) < row / 2
+                        ? g.event.note
+                        : drums
+                          ? pitch
+                          : guidedPitch(pitch, context, Math.sign(dy));
+                    if (!drums && !pitches.includes(note)) {
+                      const allowed = pitches.filter((n) =>
+                        inSongKey(n, context),
+                      );
+                      note = allowed.reduce(
+                        (closest, n) =>
+                          Math.abs(n - note) < Math.abs(closest - note)
+                            ? n
+                            : closest,
+                        allowed[0] ?? g.event.note,
+                      );
+                    }
+                    const duration = g.resize
+                      ? Math.max(
+                          stepTime(g.event.time, beat, 1) - g.event.time,
+                          magneticTime(
+                            g.event.time + g.event.duration + (dx / px) * beat,
+                            beat,
+                          ) - g.event.time,
+                        )
+                      : g.event.duration;
                     g.next = {
                       ...g.event,
-                      time: g.resize
-                        ? g.event.time
-                        : Math.max(
-                            pageStart,
-                            Math.min(
-                              pageStart + span - beat / 4,
-                              g.event.time + delta,
-                            ),
-                          ),
-                      note: g.resize
-                        ? g.event.note
-                        : pitches[
-                            Math.max(
-                              0,
-                              Math.min(
-                                pitches.length - 1,
-                                pitches.indexOf(g.event.note) - pitch,
-                              ),
-                            )
-                          ],
-                      duration: g.resize
-                        ? Math.max(beat / 4, g.event.duration + delta)
-                        : g.event.duration,
+                      time,
+                      note,
+                      duration: Math.min(120 - time, duration),
                     };
                     setDraft({ index, event: g.next });
                   }}
@@ -279,61 +372,69 @@ export function NoteCleanup({
                       e.preventDefault();
                       onChange(editNote(track, index, 'remove'));
                       setSelected(null);
-                    } else if (
-                      [
+                      return;
+                    }
+                    if (
+                      ![
                         'ArrowLeft',
                         'ArrowRight',
                         'ArrowUp',
                         'ArrowDown',
                       ].includes(e.key)
-                    ) {
-                      e.preventDefault();
-                      update(index, {
-                        ...original,
-                        note:
-                          track.instrument === 'drums'
-                            ? pitches[
-                                Math.max(
-                                  0,
-                                  Math.min(
-                                    pitches.length - 1,
-                                    pitches.indexOf(original.note) +
-                                      (e.key === 'ArrowUp'
-                                        ? -1
-                                        : e.key === 'ArrowDown'
-                                          ? 1
-                                          : 0),
-                                  ),
-                                )
-                              ]
-                            : original.note +
-                              (e.key === 'ArrowUp'
-                                ? 1
-                                : e.key === 'ArrowDown'
-                                  ? -1
-                                  : 0),
-                        time:
-                          original.time +
-                          (!e.shiftKey
-                            ? e.key === 'ArrowRight'
-                              ? beat / 4
-                              : e.key === 'ArrowLeft'
-                                ? -beat / 4
-                                : 0
-                            : 0),
-                        duration:
-                          original.duration +
-                          (e.shiftKey
-                            ? e.key === 'ArrowRight'
-                              ? beat / 4
-                              : e.key === 'ArrowLeft'
-                                ? -beat / 4
-                                : 0
-                            : 0),
-                      });
-                    }
+                    )
+                      return;
+                    e.preventDefault();
+                    const vertical =
+                        e.key === 'ArrowUp'
+                          ? 1
+                          : e.key === 'ArrowDown'
+                            ? -1
+                            : 0,
+                      horizontal =
+                        e.key === 'ArrowRight'
+                          ? 1
+                          : e.key === 'ArrowLeft'
+                            ? -1
+                            : 0;
+                    const note = vertical
+                      ? drums
+                        ? pitches[
+                            Math.max(
+                              0,
+                              Math.min(
+                                pitches.length - 1,
+                                pitches.indexOf(original.note) - vertical,
+                              ),
+                            )
+                          ]
+                        : guidedPitch(
+                            original.note + vertical,
+                            context,
+                            vertical,
+                          )
+                      : original.note;
+                    update(index, {
+                      ...original,
+                      note,
+                      time:
+                        horizontal && !e.shiftKey
+                          ? stepTime(original.time, beat, horizontal)
+                          : original.time,
+                      duration:
+                        horizontal && e.shiftKey
+                          ? Math.max(
+                              beat / 4,
+                              stepTime(
+                                original.time + original.duration,
+                                beat,
+                                horizontal,
+                              ) - original.time,
+                            )
+                          : original.duration,
+                    });
                   }}
                 >
+                  <span className="note-name">{pitchLabel(event.note)}</span>
                   <span className="note-grip" />
                 </button>
               );
@@ -342,24 +443,27 @@ export function NoteCleanup({
         </div>
       </div>
       <div className="piano-footer">
-        <span>Notes snap into place · double-click empty space to add one</span>
+        <span>
+          Double-click empty space to add {drums ? 'a hit' : 'a note'}
+        </span>
         <button
           className="text-button"
           disabled={pageStart === 0}
           onClick={() => setPage(Math.max(0, page - 1))}
         >
-          ← Earlier
+          ← Earlier bars
         </button>
         <button
           className="text-button"
           disabled={pageStart + span >= track.duration}
           onClick={() => setPage(page + 1)}
         >
-          Later →
+          Later bars →
         </button>
         <button
           className="text-button"
           disabled={!track.events.length}
+          title="Shifts the whole pattern to its first note; your recording stays unchanged"
           onClick={() => onChange(trimQuietEdges(track))}
         >
           Trim empty edges

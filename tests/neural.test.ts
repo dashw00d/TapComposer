@@ -65,6 +65,48 @@ void test('neural recognition rejects silence, DC and deterministic broadband no
     assert.equal(intent.events.length, 0, kind);
   }
 });
+void test('real CREPE handles mixed-volume dum syllables, repeated pitches and a held hum with changing timbre', async () => {
+  const rate = 16000;
+  function makeVoice(syllables: boolean) {
+    const pcm = new Float32Array(rate * 2.25);
+    let phase = 0,
+      seed = 37;
+    for (let i = 0; i < pcm.length; i++) {
+      const time = i / rate - 0.15;
+      if (time < 0 || time >= 2) continue;
+      const part = Math.floor(time / 0.5),
+        within = time % 0.5;
+      const pitch =
+        (syllables ? [60, 60, 64, 67][part] : 60) + 0.35 * Math.sin(time * 31);
+      phase += (2 * Math.PI * 440 * 2 ** ((pitch - 69) / 12)) / rate;
+      const envelope = syllables
+        ? Math.max(0, Math.min(1, within / 0.018, (0.4 - within) / 0.025))
+        : Math.min(1, time / 0.025, (2 - time) / 0.025);
+      const level = syllables ? [0.05, 0.13, 0.08, 0.2][part] : 0.12;
+      const harmonic = !syllables && time > 0.6 && time < 0.66 ? 1.3 : 0.25;
+      seed = (seed * 16807) % 2147483647;
+      pcm[i] =
+        envelope *
+        level *
+        (Math.sin(phase) +
+          harmonic * Math.sin(phase * 2) +
+          0.12 * Math.sin(phase * 3) +
+          0.04 * (seed / 2147483647 - 0.5));
+    }
+    return pcm;
+  }
+  const syllables = await neuralHum(makeVoice(true), rate, session);
+  assert.deepEqual(
+    syllables.events.map((e) => Math.round(e.pitch!)),
+    [60, 60, 64, 67],
+  );
+  syllables.events.forEach((e, i) =>
+    assert.ok(Math.abs(e.time - (0.15 + i * 0.5)) < 0.08),
+  );
+  const held = await neuralHum(makeVoice(false), rate, session);
+  assert.equal(held.events.length, 1);
+  assert.equal(Math.round(held.events[0].pitch!), 60);
+});
 void test('voice resampling preserves duration and pitch at 44.1 and 48 kHz', async () => {
   for (const rate of [44100, 48000]) {
     const { pcm } = melody(0.3, rate);

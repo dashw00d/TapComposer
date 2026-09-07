@@ -154,7 +154,7 @@ export function Recorder({
       transition('ready');
       setError(
         intent.source === 'hum'
-          ? 'I couldn’t find a clear melody. Try a steady “hmm”, a little closer to the microphone.'
+          ? 'I couldn’t pick out the notes in that take. Try again a little closer to the microphone.'
           : 'I couldn’t hear distinct taps. Try a few firmer taps with little gaps between them.',
       );
       return;
@@ -418,7 +418,7 @@ export function Recorder({
           {phase === 'review'
             ? 'Same idea, different instruments. Choose a sound to hear it.'
             : mode === 'hum'
-              ? 'A few notes are enough. Hum them one at a time.'
+              ? 'Hum or sing your idea. A “hmm” or “dum dum” is enough.'
               : mode === 'touch'
                 ? 'Tap the pad or press Space while it’s selected.'
                 : 'Tap a desk near your microphone. Leave a little space between taps.'}
