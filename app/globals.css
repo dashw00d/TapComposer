@@ -921,7 +921,7 @@ footer {
     gap: 8px;
   }
 }
-/* The composition workspace keeps musical structure visible without exposing a note editor. */
+/* The composition workspace keeps the song and selected notes together. */
 .studio-workspace {
   max-width: 1380px;
   padding-top: 38px;
@@ -1762,4 +1762,424 @@ footer {
 .capture-cue.live {
   color: #d6f68a;
   font-size: 25px;
+}
+.control-help {
+  font-size: 12px;
+  color: #a8b9c6;
+  margin: 10px 0 16px;
+}
+.arrangement-drawer > summary {
+  cursor: pointer;
+  padding: 18px 0 0;
+  color: #d2e4bf;
+  font-size: 14px;
+}
+.arrangement-drawer[open] > summary {
+  padding-bottom: 8px;
+}
+.keep-part-option {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 12px;
+  margin: 12px 0;
+}
+/* The music is the workspace: playlist above, the selected part's notes below. */
+.workspace-label {
+  color: #b9c8d4;
+  font-size: 12px;
+}
+.playlist {
+  margin-top: 18px;
+  min-width: 0;
+}
+.playlist-heading,
+.selected-part-heading,
+.piano-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  justify-content: space-between;
+}
+.playlist-heading strong {
+  font-size: 17px;
+}
+.playlist-heading p,
+.piano-editor > p {
+  font-size: 12px;
+  color: #a8bac9;
+  line-height: 1.6;
+  margin: 5px 0 12px;
+}
+.playlist-zoom {
+  display: flex;
+  gap: 5px;
+}
+.playlist-zoom .button {
+  padding: 4px 12px;
+  font-size: 18px;
+}
+.playlist-scroll {
+  overflow: auto;
+  border: 1px solid #3a4855;
+  border-radius: 10px;
+  background: #111923;
+}
+.playlist-canvas {
+  position: relative;
+}
+.playlist-ruler,
+.playlist-row {
+  display: flex;
+  position: relative;
+}
+.playlist-ruler {
+  height: 29px;
+  background: #25303c;
+}
+.playlist-ruler > div {
+  position: relative;
+}
+.playlist-ruler > div button {
+  position: absolute;
+  height: 29px;
+  border-left: 1px solid #536272;
+  text-align: left;
+  padding-left: 7px;
+  color: #c8d5df;
+  font-size: 10px;
+}
+.lane-label {
+  width: 164px;
+  flex: 0 0 164px;
+  position: sticky;
+  left: 0;
+  z-index: 3;
+  background: #212c38;
+  display: flex;
+  align-items: center;
+  border-bottom: 1px solid #3b4855;
+  border-right: 1px solid #536272;
+}
+.ruler-label {
+  font-size: 9px;
+  color: #96aabd;
+  padding-left: 13px;
+  letter-spacing: 1.3px;
+}
+.lane-name {
+  flex: 1;
+  min-width: 0;
+  text-align: left;
+  padding: 12px 4px 12px 12px;
+  border-left: 3px solid var(--part-color);
+}
+.lane-name strong {
+  display: block;
+  font-size: 12px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: #edf1f6;
+}
+.lane-name span {
+  display: block;
+  font-size: 9px;
+  color: #9db1c2;
+  margin-top: 4px;
+}
+.lane-name[aria-pressed='true'] {
+  background: #344453;
+}
+.lane-mute {
+  padding: 6px;
+  color: #acbac6;
+}
+.playlist-lane {
+  height: 70px;
+  position: relative;
+  border-bottom: 1px solid #303e4b;
+  background-image:
+    linear-gradient(to right, #32405055 1px, transparent 1px),
+    linear-gradient(to right, #59677366 1px, transparent 1px);
+}
+.music-clip {
+  position: absolute;
+  top: 6px;
+  height: 57px;
+  border-radius: 4px;
+  border: 1px solid var(--part-color);
+  background: color-mix(in srgb, var(--part-color) 22%, #17212c);
+  text-align: left;
+  overflow: hidden;
+  touch-action: none;
+  user-select: none;
+  cursor: grab;
+}
+.music-clip:active {
+  cursor: grabbing;
+}
+.music-clip[aria-pressed='true'] {
+  outline: 2px solid #e4f8b8;
+  outline-offset: 1px;
+}
+.clip-title {
+  position: absolute;
+  inset: 0 0 auto;
+  padding: 3px 7px;
+  font-size: 9px;
+  font-weight: 600;
+  color: #101923;
+  background: var(--part-color);
+  white-space: nowrap;
+}
+.clip-notes {
+  position: absolute;
+  inset: 21px 4px 2px;
+}
+.clip-notes i {
+  position: absolute;
+  height: 3px;
+  border-radius: 1px;
+  background: var(--part-color);
+}
+.clip-grip,
+.note-grip {
+  position: absolute;
+  right: 0;
+  top: 0;
+  height: 100%;
+  width: 9px;
+  cursor: ew-resize;
+  border-right: 3px solid #ffffff55;
+}
+.lane-muted .playlist-lane {
+  opacity: 0.35;
+}
+.playlist-playhead {
+  position: absolute;
+  top: 29px;
+  bottom: 0;
+  width: 1px;
+  background: #f0f7db;
+  pointer-events: none;
+  z-index: 2;
+}
+.playlist-hint {
+  color: #91a5b8;
+  font-size: 11px;
+  margin: 9px 0;
+  line-height: 1.5;
+}
+.selected-part {
+  margin-top: 18px;
+  background: #19232e;
+  border: 1px solid #445362;
+  border-top: 3px solid var(--part-color);
+  border-radius: 10px;
+  padding: 16px;
+}
+.selected-part-heading strong {
+  display: block;
+  font-size: 18px;
+  color: var(--part-color);
+}
+.selected-part-heading span {
+  display: block;
+  color: #a7b9c9;
+  font-size: 11px;
+  line-height: 1.6;
+  margin-top: 4px;
+}
+.clip-actions,
+.sound-choices {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+  align-items: center;
+  margin: 14px 0;
+  font-size: 11px;
+}
+.clip-actions > span,
+.sound-choices > span {
+  margin-right: 5px;
+  color: #a5b8c8;
+}
+.clip-actions label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.clip-actions .button,
+.sound-choices .button,
+.piano-toolbar .button {
+  font-size: 11px;
+  padding: 7px 10px;
+}
+.sound-choices .button[aria-pressed='true'] {
+  border-color: var(--part-color);
+  background: color-mix(in srgb, var(--part-color) 20%, #19232e);
+}
+.piano-editor {
+  min-width: 0;
+}
+.piano-toolbar {
+  flex-wrap: wrap;
+  justify-content: flex-start;
+  margin: 16px 0 10px;
+}
+.piano-toolbar > strong {
+  font-size: 12px;
+  margin-right: auto;
+}
+.piano-scroll {
+  overflow: auto;
+  max-height: 365px;
+  border: 1px solid #435465;
+  border-radius: 6px;
+  background: #131d27;
+}
+.piano-canvas {
+  position: relative;
+}
+.piano-ruler {
+  position: absolute;
+  top: 0;
+  right: 0;
+  height: 25px;
+  background: #293644;
+}
+.piano-ruler span {
+  position: absolute;
+  font-size: 10px;
+  color: #aec1d3;
+  padding: 5px 8px;
+  border-left: 1px solid #627588;
+}
+.piano-keys {
+  position: sticky;
+  left: 0;
+  width: 44px;
+  z-index: 2;
+}
+.piano-keys > div {
+  background: #bbc5ce;
+  color: #243340;
+  font-size: 9px;
+  border-bottom: 1px solid #657685;
+  text-align: right;
+  padding-right: 5px;
+}
+.piano-keys > .black-key {
+  background: #344351;
+  color: #bac8d5;
+  border-right: 7px solid #bbc5ce;
+}
+.piano-grid {
+  position: absolute;
+  background-image:
+    linear-gradient(to right, #41556733 1px, transparent 1px),
+    linear-gradient(to right, #8196a444 1px, transparent 1px),
+    linear-gradient(to bottom, #61738133 1px, transparent 1px);
+}
+.piano-note {
+  position: absolute;
+  border: 1px solid #c2e4aa;
+  border-radius: 3px;
+  background: var(--part-color, #a7d786);
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
+}
+.piano-note:active {
+  cursor: grabbing;
+}
+.piano-note[aria-pressed='true'] {
+  background: #e6fba9;
+  border-color: white;
+  box-shadow: 0 0 0 1px #f4ffd8;
+}
+.piano-footer {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: center;
+  font-size: 10px;
+  color: #9aafc0;
+  padding-top: 10px;
+}
+.piano-footer > span {
+  margin-right: auto;
+}
+.piano-footer .text-button {
+  font-size: 11px;
+}
+.music-clip:focus-visible,
+.piano-note:focus-visible {
+  outline: 2px solid white;
+  outline-offset: 2px;
+}
+@media (max-width: 600px) {
+  .selected-part {
+    padding: 10px;
+  }
+  .playlist-heading strong {
+    font-size: 15px;
+  }
+  .playlist-heading p {
+    max-width: 230px;
+  }
+}
+.has-song.studio-workspace {
+  padding-top: 18px;
+}
+.has-song .capture-first {
+  padding: 12px 15px;
+  gap: 10px;
+}
+.has-song .capture-first strong {
+  font-size: 14px;
+}
+.has-song .capture-first span {
+  display: none;
+}
+.has-song .instrument-drawer {
+  margin-bottom: 12px;
+}
+.has-song .studio-toolbar {
+  margin: 12px 0;
+}
+.has-song .transport-line {
+  margin: 14px 0;
+}
+.has-song .composition-panel {
+  margin-top: 16px;
+  padding: 16px;
+}
+.has-song .arranger-heading h2 {
+  font-size: 18px;
+}
+.has-song .arranger-heading .eyebrow {
+  font-size: 9px;
+  margin-bottom: 5px;
+}
+.has-song .arranger-heading {
+  flex-direction: row;
+  align-items: center;
+}
+.has-song .arranger-heading > .button {
+  width: auto;
+  font-size: 12px;
+}
+@media (max-width: 600px) {
+  .has-song .capture-first > div {
+    flex: 0 0 100%;
+  }
+  .has-song .capture-first {
+    padding: 10px 12px;
+  }
+}
+
+.has-song .song-section {
+  margin-top: 20px;
 }

@@ -120,6 +120,7 @@ void test('arrangement controls change audible section membership, order and len
       position={0}
     />,
   );
+  fireEvent.click(screen.getByText('Song settings'));
   const original = song.sections![0].bars;
   fireEvent.click(screen.getByRole('button', { name: 'Lengthen A way in' }));
   assert.equal(song.sections![0].bars, original + 2);
@@ -551,5 +552,142 @@ void test('microphone countdown follows the capture clock, shares backing start,
     globalThis.AudioWorkletNode = oldWorklet;
     if (oldMedia) Object.defineProperty(navigator, 'mediaDevices', oldMedia);
     else Reflect.deleteProperty(navigator, 'mediaDevices');
+  }
+});
+
+void test('playlist gestures move and resize audible blocks, while piano-roll edits keep source notes and undo together', async () => {
+  const { SongTimeline } = await import('../components/song-timeline');
+  const { arrangedTracks } = await import('../lib/music/composition');
+  const { songClips } = await import('../lib/music/clips');
+  const original = sample();
+  let song = original;
+  const past: Song[] = [];
+  const auditions: { note: number; time: number }[] = [];
+  Object.defineProperty(window, 'PointerEvent', {
+    configurable: true,
+    value: window.MouseEvent,
+  });
+  const capture = Object.getOwnPropertyDescriptor(
+    HTMLElement.prototype,
+    'setPointerCapture',
+  );
+  const release = Object.getOwnPropertyDescriptor(
+    HTMLElement.prototype,
+    'releasePointerCapture',
+  );
+  HTMLElement.prototype.setPointerCapture = () => {};
+  HTMLElement.prototype.releasePointerCapture = () => {};
+  const update = (change: (song: Song) => Song) => {
+    past.push(song);
+    song = change(song);
+    view.rerender(ui());
+  };
+  const ui = () => (
+    <SongTimeline
+      song={song}
+      update={update}
+      onPlay={() => {}}
+      onAudition={(track, index) => auditions.push(track.events[index])}
+      playing={null}
+      position={0}
+      onSeek={() => {}}
+      onMore={() => {}}
+      onUndo={() => {
+        song = past.pop()!;
+        view.rerender(ui());
+      }}
+      canUndo={past.length > 0}
+    />
+  );
+  const view = render(ui());
+  try {
+    const clip = screen.getByRole('button', {
+      name: 'My melody, bar 1, 4 bars',
+    });
+    clip.getBoundingClientRect = () => ({
+      left: 0,
+      right: 190,
+      top: 0,
+      bottom: 57,
+      width: 190,
+      height: 57,
+      x: 0,
+      y: 0,
+      toJSON() {},
+    });
+    fireEvent.pointerDown(clip, { button: 0, clientX: 20, clientY: 20 });
+    fireEvent.pointerMove(clip, { clientX: 68, clientY: 20 });
+    fireEvent.pointerUp(clip, { clientX: 68, clientY: 20 });
+    assert.equal(songClips(song)[0].startBeat, 4);
+    assert.equal(past.length, 1, 'a drag creates one undo entry');
+    assert.equal(
+      arrangedTracks(song)[0].events[0].time,
+      (4 * 60) / song.context!.tempo,
+    );
+    const moved = screen.getByRole('button', {
+      name: 'My melody, bar 2, 4 bars',
+    });
+    fireEvent.pointerDown(moved, { button: 0, clientX: 186, clientY: 20 });
+    fireEvent.pointerMove(moved, { clientX: 138, clientY: 20 });
+    fireEvent.pointerUp(moved, { clientX: 138, clientY: 20 });
+    assert.equal(songClips(song)[0].lengthBeats, 12);
+    const note = screen.getByRole('button', { name: /^Note 1, pitch/ });
+    note.getBoundingClientRect = () => ({
+      left: 0,
+      right: 70,
+      top: 0,
+      bottom: 16,
+      width: 70,
+      height: 16,
+      x: 0,
+      y: 0,
+      toJSON() {},
+    });
+    fireEvent.pointerDown(note, { button: 0, clientX: 10, clientY: 40 });
+    fireEvent.pointerMove(note, { clientX: 28, clientY: 22 });
+    fireEvent.pointerUp(note, { clientX: 28, clientY: 22 });
+    assert.equal(
+      song.tracks[0].events[0].note,
+      original.tracks[0].events[0].note + 1,
+    );
+    assert.equal(
+      song.tracks[0].events[0].time,
+      (0.25 * 60) / song.context!.tempo,
+    );
+    assert.equal(auditions.at(-1)!.note, song.tracks[0].events[0].note);
+    assert.equal(song.tracks[0].intent, original.tracks[0].intent);
+    fireEvent.click(screen.getByRole('button', { name: 'Delete note' }));
+    assert.equal(
+      song.tracks[0].events.length,
+      original.tracks[0].events.length - 1,
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Undo' }));
+    assert.equal(
+      song.tracks[0].events.length,
+      original.tracks[0].events.length,
+    );
+    const editedNotes = song.tracks[0].events;
+    fireEvent.click(screen.getByRole('button', { name: 'Strings' }));
+    assert.equal(song.tracks[0].instrument, 'strings');
+    assert.deepEqual(song.tracks[0].events, editedNotes);
+    fireEvent.click(screen.getByRole('button', { name: 'Delete block' }));
+    assert.equal(song.clips!.length, songClips(original).length - 1);
+    assert.equal(song.tracks[0].intent, original.tracks[0].intent);
+  } finally {
+    cleanup();
+    if (capture)
+      Object.defineProperty(
+        HTMLElement.prototype,
+        'setPointerCapture',
+        capture,
+      );
+    else Reflect.deleteProperty(HTMLElement.prototype, 'setPointerCapture');
+    if (release)
+      Object.defineProperty(
+        HTMLElement.prototype,
+        'releasePointerCapture',
+        release,
+      );
+    else Reflect.deleteProperty(HTMLElement.prototype, 'releasePointerCapture');
   }
 });

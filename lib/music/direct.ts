@@ -112,6 +112,20 @@ export function directPart(song: Song, id: string, direction: Direction): Song {
     tracks: song.tracks.map((t) =>
       t.id === id ? { ...t, events, pinned: true, edited: true } : t,
     ),
+    clips:
+      direction === 'later'
+        ? song.clips?.map((clip) =>
+            clip.trackId === id
+              ? {
+                  ...clip,
+                  startBeat: Math.min(
+                    512 - clip.lengthBeats,
+                    clip.startBeat + 4,
+                  ),
+                }
+              : clip,
+          )
+        : song.clips,
     sections:
       direction === 'later'
         ? song.sections?.map((s) =>

@@ -66,12 +66,13 @@ export function resolveIntent(
   context: SongContext,
   smoother = false,
   preserveOffset = false,
+  preserveTiming = false,
 ): { events: PerformanceEvent[]; duration: number } {
   if (!intent.events.length) return { events: [], duration: 0 };
   const offset = preserveOffset ? 0 : intent.events[0].time;
   const beat = 60 / context.tempo,
     grid = beat / 2;
-  const strength = smoother ? 0.8 : 0.28;
+  const strength = preserveTiming ? 0 : smoother ? 0.8 : 0.28;
   const events: PerformanceEvent[] = intent.events.flatMap((e, i) => {
     const raw = Math.max(0, e.time - offset);
     const time = Math.max(

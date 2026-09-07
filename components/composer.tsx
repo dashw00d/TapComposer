@@ -1,14 +1,7 @@
 'use client';
-import {
-  createElement,
-  useEffect,
-  useEffectEvent,
-  useRef,
-  useState,
-} from 'react';
+import { useEffect, useEffectEvent, useRef, useState } from 'react';
 import Link from 'next/link';
 import {
-  Pin,
   GitBranch,
   AudioLines,
   Guitar,
@@ -27,15 +20,12 @@ import {
   Headphones,
   LoaderCircle,
   Mic,
-  MoreHorizontal,
   Piano,
   Play,
   Plus,
   Sparkles,
   Square,
   Trash2,
-  Volume2,
-  VolumeX,
   X,
 } from 'lucide-react';
 import {
@@ -65,7 +55,6 @@ import { useSongHistory } from '@/hooks/use-song-history';
 import { INSTRUMENTS, instrumentInfo } from '@/lib/music/instruments';
 import {
   arrangedTracks,
-  patternTracks,
   changeInstrument,
   keepIdea,
 } from '@/lib/music/composition';
@@ -92,11 +81,12 @@ import {
   type Track,
 } from '@/lib/music/types';
 import { Recorder } from './recorder';
+import { NoteCleanup } from './note-cleanup';
+import { SongTimeline } from './song-timeline';
 
 export default function Composer() {
   const history = useSongHistory();
   const { song, load: loadSong } = history;
-  const [view, setView] = useState<'song' | 'ideas'>('song');
   const [mixOpen, setMixOpen] = useState(false);
   const [proposal, setProposal] = useState<{
     label: string;
@@ -106,6 +96,7 @@ export default function Composer() {
     retry?: (song: Song) => Song;
     serial: number;
   } | null>(null);
+  const proposalSerial = useRef(0);
   const [branchOpen, setBranchOpen] = useState(false);
   const [branchName, setBranchName] = useState('');
 
@@ -217,8 +208,7 @@ export default function Composer() {
     const resume = playing === 'all';
     updateSong(() => next);
     if (resume) {
-      const prepared =
-        view === 'song' ? arrangedTracks(next) : patternTracks(next);
+      const prepared = arrangedTracks(next);
       const nextAt = ((at / oldBeat) * 60) / (next.context?.tempo ?? 100);
       void play(
         prepared,
@@ -299,7 +289,7 @@ export default function Composer() {
       before: song,
       after,
       retry,
-      serial: Date.now(),
+      serial: ++proposalSerial.current,
       sources: [
         { id: 'before', label: 'Before', song },
         { id: 'after', label: 'Proposed', song: after },
@@ -332,12 +322,10 @@ export default function Composer() {
       tracks.reduce((next, track) => keepIdea(next, track, context), s),
     );
     setRecorder(null);
-    setView('song');
   }
   function keep(track: Track, context: NonNullable<Song['context']>) {
     updateSong((s) => keepIdea(s, track, context));
     setRecorder(null);
-    setView('song');
   }
   function patchTrack(id: string, change: (track: Track) => Track) {
     stop();
@@ -450,11 +438,7 @@ export default function Composer() {
   }
   const tracks = song?.tracks ?? [],
     detail = tracks.find((t) => t.id === detailId);
-  const transportTracks = song
-    ? view === 'song'
-      ? arrangedTracks(song)
-      : patternTracks(song)
-    : [];
+  const transportTracks = song ? arrangedTracks(song) : [];
   const duration = songDuration(transportTracks),
     canPlay = transportTracks.some((t) => !t.muted && t.events.length);
   const position = playing ? progress * playedDuration : seekAt;
@@ -541,19 +525,23 @@ export default function Composer() {
           </button>
         </div>
       </header>
-      <main className="workspace studio-workspace">
-        <div className="intro">
-          <div>
-            <p className="eyebrow">A LITTLE MUSIC, ALL YOURS</p>
-            <h1>A song starts with you.</h1>
-            <p>Tap or hum an idea. We’ll help it become a song.</p>
+      <main
+        className={`workspace studio-workspace ${tracks.length ? 'has-song' : ''}`}
+      >
+        {!tracks.length && (
+          <div className="intro">
+            <div>
+              <p className="eyebrow">A LITTLE MUSIC, ALL YOURS</p>
+              <h1>A song starts with you.</h1>
+              <p>Tap or hum an idea. We’ll help it become a song.</p>
+            </div>
+            <span className="intro-note">
+              No wrong notes.
+              <br />
+              No lessons needed.
+            </span>
           </div>
-          <span className="intro-note">
-            No wrong notes.
-            <br />
-            No lessons needed.
-          </span>
-        </div>
+        )}
         {error && (
           <div className="error-box page-error" role="alert">
             <span>{error}</span>
@@ -564,7 +552,9 @@ export default function Composer() {
         )}
         <div className="capture-first">
           <div>
-            <strong>Catch an idea.</strong>
+            <strong>
+              {tracks.length ? 'Add to your song' : 'Catch an idea.'}
+            </strong>
             <span>Choose its instruments after you hear it.</span>
           </div>
           <button
@@ -649,34 +639,11 @@ export default function Composer() {
                 ? 'Getting ready…'
                 : playing === 'all'
                   ? 'Stop playing'
-                  : view === 'song'
-                    ? 'Play my song'
-                    : 'Play my ideas'}
+                  : 'Play my song'}
             </button>
           </div>
           <div className="studio-toolbar">
-            <div className="view-buttons">
-              <button
-                aria-pressed={view === 'song'}
-                onClick={() => {
-                  stop();
-                  setSeekAt(0);
-                  setView('song');
-                }}
-              >
-                The song
-              </button>
-              <button
-                aria-pressed={view === 'ideas'}
-                onClick={() => {
-                  stop();
-                  setSeekAt(0);
-                  setView('ideas');
-                }}
-              >
-                The ingredients
-              </button>
-            </div>
+            <span className="workspace-label">Song workspace</span>
             <div className="history-actions">
               <button
                 className="icon-button"
@@ -725,7 +692,7 @@ export default function Composer() {
                 disabled={!tracks.length}
                 onClick={() => setMixOpen(!mixOpen)}
               >
-                <SlidersHorizontal size={17} /> Balance
+                <SlidersHorizontal size={17} /> Volume & balance
               </button>
             </div>
           </div>
@@ -764,32 +731,6 @@ export default function Composer() {
               </span>
             </div>
           )}
-          {song && tracks.length > 0 && view === 'song' && (
-            <CompositionPanel
-              song={song}
-              update={updateMusic}
-              onSeek={(seconds) =>
-                void play(arrangedTracks(song), 'all', seconds, true)
-              }
-              position={position}
-              onPropose={propose}
-            />
-          )}
-          {song && (
-            <PremiumStudio
-              key={song.id}
-              song={song}
-              engine={audioEngine}
-              onBeforePlay={stop}
-              originalPlaying={!!playing}
-              onKeep={(take) =>
-                updateSong((s) => ({
-                  ...s,
-                  premiumTakes: [take, ...(s.premiumTakes ?? [])].slice(0, 3),
-                }))
-              }
-            />
-          )}
           {song && mixOpen && <MixControls song={song} update={updateMusic} />}
           {tracks.length === 0 ? (
             <div className="empty-song">
@@ -806,118 +747,44 @@ export default function Composer() {
             </div>
           ) : (
             <>
-              <div className="track-list studio-track-list">
-                {tracks.map((track) => (
-                  <div
-                    key={track.id}
-                    className={`track-row ${track.muted ? 'muted' : ''}`}
-                  >
-                    <button
-                      className={`track-icon ${track.instrument}`}
-                      style={{
-                        background: instrumentInfo(track.instrument).color,
-                      }}
-                      aria-label={`Listen to ${track.name}`}
-                      disabled={track.muted || loading}
-                      onClick={() =>
-                        play(
-                          song
-                            ? patternTracks({ ...song, tracks: [track] })
-                            : [track],
-                          track.id,
-                        )
-                      }
-                    >
-                      {playing === track.id ? (
-                        <Square size={20} />
-                      ) : (
-                        createElement(icons[track.instrument], { size: 24 })
-                      )}
-                    </button>
-                    <div className="track-info">
-                      <button
-                        className="track-name"
-                        onClick={() => setDetailId(track.id)}
-                      >
-                        {track.name}
-                      </button>
-                      <span>
-                        {originLabel(track)}
-                        {track.pinned ? ' · kept' : ''}
-                        {track.smoother ? ' · Smoothed' : ''}
-                      </span>
-                    </div>
-                    <button
-                      className="icon-button pin-part"
-                      aria-label={`${track.pinned ? 'Release' : 'Keep'} ${track.name}`}
-                      aria-pressed={track.pinned ?? false}
-                      title="Keep this part during automatic changes"
-                      onClick={() =>
-                        patchTrack(track.id, (t) => ({
-                          ...t,
-                          pinned: !t.pinned,
-                        }))
-                      }
-                    >
-                      <Pin size={16} />
-                    </button>
-                    <button
-                      className="track-strip"
-                      aria-label={`Open ${track.name}`}
-                      onClick={() => setDetailId(track.id)}
-                    >
-                      <div className="note-strip" aria-hidden="true">
-                        {track.events.map((e, i) => (
-                          <i
-                            key={i}
-                            style={{
-                              left: `${(e.time / track.duration) * 96}%`,
-                              width: `${Math.max(0.8, (e.duration / track.duration) * 96)}%`,
-                              height:
-                                track.instrument === 'piano'
-                                  ? '7px'
-                                  : `${12 + e.velocity * 22}px`,
-                              top:
-                                track.instrument === 'piano'
-                                  ? `${12 + ((84 - e.note) / 48) * 65}%`
-                                  : '25%',
-                              background: instrumentInfo(track.instrument)
-                                .color,
-                            }}
-                          />
-                        ))}
-                        {(playing === 'all' || playing === track.id) && (
-                          <b
-                            className="playhead"
-                            style={{ left: `${progress * 100}%` }}
-                          />
-                        )}
-                      </div>
-                    </button>
-                    <button
-                      className="icon-button"
-                      aria-label={`${track.muted ? 'Unmute' : 'Mute'} ${track.name}`}
-                      title={track.muted ? 'Turn sound on' : 'Turn sound off'}
-                      onClick={() =>
-                        patchTrack(track.id, (t) => ({ ...t, muted: !t.muted }))
-                      }
-                    >
-                      {track.muted ? (
-                        <VolumeX size={19} />
-                      ) : (
-                        <Volume2 size={19} />
-                      )}
-                    </button>
-                    <button
-                      className="icon-button"
-                      aria-label={`Options for ${track.name}`}
-                      onClick={() => setDetailId(track.id)}
-                    >
-                      <MoreHorizontal size={21} />
-                    </button>
-                  </div>
-                ))}
-              </div>
+              {song && (
+                <SongTimeline
+                  key={song.id}
+                  song={song}
+                  update={updateSong}
+                  onPlay={(track) =>
+                    void play([{ ...track, muted: false }], track.id)
+                  }
+                  onAudition={(track, index) => {
+                    const e = track.events[index];
+                    if (e)
+                      void play(
+                        [
+                          {
+                            ...track,
+                            muted: false,
+                            events: [{ ...e, time: 0 }],
+                            duration: e.duration,
+                          },
+                        ],
+                        track.id,
+                        0,
+                        true,
+                      );
+                  }}
+                  playing={playing}
+                  position={playing === 'all' ? position : seekAt}
+                  onSeek={(seconds) =>
+                    void play(arrangedTracks(song), 'all', seconds, true)
+                  }
+                  onMore={setDetailId}
+                  onUndo={() => {
+                    stop();
+                    history.undo();
+                  }}
+                  canUndo={history.canUndo}
+                />
+              )}
               <div className="song-controls">
                 <label className="repeat-control" htmlFor="repeat-song">
                   <Switch
@@ -943,6 +810,33 @@ export default function Composer() {
                 </button>
               </div>
             </>
+          )}
+          {song && tracks.length > 0 && (
+            <CompositionPanel
+              showSections={false}
+              song={song}
+              update={updateMusic}
+              onSeek={(seconds) =>
+                void play(arrangedTracks(song), 'all', seconds, true)
+              }
+              position={position}
+              onPropose={propose}
+            />
+          )}
+          {song && (
+            <PremiumStudio
+              key={song.id}
+              song={song}
+              engine={audioEngine}
+              onBeforePlay={stop}
+              originalPlaying={!!playing}
+              onKeep={(take) =>
+                updateSong((s) => ({
+                  ...s,
+                  premiumTakes: [take, ...(s.premiumTakes ?? [])].slice(0, 3),
+                }))
+              }
+            />
           )}
         </section>
         <footer>
@@ -1209,8 +1103,61 @@ export default function Composer() {
                     ? 'Composed from your song’s rhythm and harmony.'
                     : 'Your original idea stays available.'}
               </p>
-              <details className="gentle-details" open>
-                <summary>Give this part a direction</summary>
+              <p className="field-label">Instrument · change the sound</p>
+              <Select
+                value={detail.instrument}
+                onValueChange={(value) => {
+                  if (value)
+                    patchTrack(detail.id, (t) =>
+                      changeInstrument(t, value as Instrument, song!.context!),
+                    );
+                }}
+              >
+                <SelectTrigger className="full" aria-label="Change instrument">
+                  <SelectValue>
+                    {instrumentInfo(detail.instrument).name}
+                  </SelectValue>
+                </SelectTrigger>
+                <SelectContent>
+                  {INSTRUMENTS.map((i) => (
+                    <SelectItem key={i.id} value={i.id}>
+                      {i.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <NoteCleanup
+                key={detail.id}
+                track={detail}
+                tempo={song?.context?.tempo}
+                onChange={(next) => patchTrack(detail.id, () => next)}
+                onPlay={() => play([{ ...detail, muted: false }], detail.id)}
+                onAudition={(track, index) => {
+                  const e = track.events[index];
+                  if (e)
+                    void play(
+                      [
+                        {
+                          ...track,
+                          muted: false,
+                          events: [{ ...e, time: 0 }],
+                          duration: e.duration,
+                        },
+                      ],
+                      detail.id,
+                      0,
+                      true,
+                    );
+                }}
+                playing={playing === detail.id}
+                onUndo={() => {
+                  stop();
+                  history.undo();
+                }}
+                canUndo={history.canUndo}
+              />
+              <details className="gentle-details" open={detail.generated}>
+                <summary>Change what it plays</summary>
                 <div className="direction-buttons">
                   {DIRECTIONS.map((direction) => (
                     <button
@@ -1261,134 +1208,144 @@ export default function Composer() {
                   </button>
                 )}
               </details>
-              <label className="field-label" htmlFor="part-name">
-                Name this idea
-              </label>
-              <input
-                id="part-name"
-                className="part-name-input"
-                key={detail.id}
-                defaultValue={detail.name}
-                maxLength={60}
-                onBlur={(e) => {
-                  const name = e.target.value.trim();
-                  if (name && name !== detail.name)
-                    patchTrack(detail.id, (t) => ({ ...t, name }));
-                }}
-              />
-              <Select
-                value={detail.instrument}
-                onValueChange={(value) => {
-                  if (value)
-                    patchTrack(detail.id, (t) =>
-                      changeInstrument(t, value as Instrument, song!.context!),
-                    );
-                }}
-              >
-                <SelectTrigger className="full" aria-label="Change instrument">
-                  <SelectValue>
-                    {instrumentInfo(detail.instrument).name}
-                  </SelectValue>
-                </SelectTrigger>
-                <SelectContent>
-                  {INSTRUMENTS.map((i) => (
-                    <SelectItem key={i.id} value={i.id}>
-                      {i.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <button
-                className="button full"
-                disabled={tracks.length >= MAX_TRACKS}
-                onClick={() => {
-                  const id = crypto.randomUUID();
-                  updateSong((s) => ({
-                    ...s,
-                    tracks: [
-                      ...s.tracks,
-                      {
-                        ...detail,
-                        id,
-                        name: `${detail.name} copy`,
-                        pinned: true,
-                        edited: true,
-                      },
-                    ],
-                    sections: s.sections?.map((section) => ({
-                      ...section,
-                      trackIds: section.trackIds.includes(detail.id)
-                        ? [...section.trackIds, id]
-                        : section.trackIds,
-                    })),
-                  }));
-                  setDetailId(id);
-                }}
-              >
-                <Copy size={18} /> Make a copy
-              </button>
+              <details className="gentle-details">
+                <summary>Sound &amp; other options</summary>
+                <label className="keep-part-option">
+                  <Switch
+                    checked={detail.pinned ?? false}
+                    onCheckedChange={(pinned) =>
+                      patchTrack(detail.id, (t) => ({ ...t, pinned }))
+                    }
+                  />{' '}
+                  Protect my edits when rearranging
+                </label>
+                <label className="field-label" htmlFor="part-name">
+                  Name this idea
+                </label>
+                <input
+                  id="part-name"
+                  className="part-name-input"
+                  key={detail.id}
+                  defaultValue={detail.name}
+                  maxLength={60}
+                  onBlur={(e) => {
+                    const name = e.target.value.trim();
+                    if (name && name !== detail.name)
+                      patchTrack(detail.id, (t) => ({ ...t, name }));
+                  }}
+                />
 
-              <button
-                className="button full"
-                onClick={() => play([detail], detail.id)}
-                disabled={detail.muted || loading}
-              >
-                {playing === detail.id ? (
-                  <Square size={18} />
-                ) : (
-                  <Play size={18} />
-                )}{' '}
-                {playing === detail.id ? 'Stop' : 'Listen to this part'}
-              </button>
-              <button
-                className="button full"
-                aria-pressed={detail.smoother}
-                onClick={() =>
-                  patchTrack(detail.id, (t) => smoothTrack(t, song!.context!))
-                }
-              >
-                <Sparkles size={18} />
-                {detail.smoother ? 'Undo smoothing' : 'Make smoother'}
-              </button>
-              <button
-                className="button full"
-                onClick={() => openRecorder(detail.instrument, detail.id)}
-              >
-                <Mic size={18} /> Record again
-              </button>
-              {detail.original && (
                 <button
                   className="button full"
+                  disabled={tracks.length >= MAX_TRACKS}
+                  onClick={() => {
+                    const id = crypto.randomUUID();
+                    updateSong((s) => ({
+                      ...s,
+                      tracks: [
+                        ...s.tracks,
+                        {
+                          ...detail,
+                          id,
+                          name: `${detail.name} copy`,
+                          pinned: true,
+                          edited: true,
+                        },
+                      ],
+                      clips: s.clips
+                        ? [
+                            ...s.clips,
+                            ...s.clips
+                              .filter((c) => c.trackId === detail.id)
+                              .map((c) => ({
+                                ...c,
+                                id: crypto.randomUUID(),
+                                trackId: id,
+                              })),
+                          ].slice(0, 576)
+                        : undefined,
+                      sections: s.sections?.map((section) => ({
+                        ...section,
+                        trackIds: section.trackIds.includes(detail.id)
+                          ? [...section.trackIds, id]
+                          : section.trackIds,
+                      })),
+                    }));
+                    setDetailId(id);
+                  }}
+                >
+                  <Copy size={18} /> Make a copy
+                </button>
+
+                <button
+                  className="button full"
+                  onClick={() => play([detail], detail.id)}
+                  disabled={detail.muted || loading}
+                >
+                  {playing === detail.id ? (
+                    <Square size={18} />
+                  ) : (
+                    <Play size={18} />
+                  )}{' '}
+                  {playing === detail.id ? 'Stop' : 'Listen to this part'}
+                </button>
+                <button
+                  className="button full"
+                  aria-pressed={detail.smoother}
+                  disabled={detail.edited}
+                  title={
+                    detail.edited
+                      ? 'Use the note controls to tidy this edited part'
+                      : 'Gently tighten the original timing'
+                  }
                   onClick={() =>
-                    download(
-                      detail.original!,
-                      `${safeFilename(detail.name)}-original.wav`,
-                    )
+                    patchTrack(detail.id, (t) => smoothTrack(t, song!.context!))
                   }
                 >
-                  <Download size={18} /> Save original recording
+                  <Sparkles size={18} />
+                  {detail.smoother ? 'Undo smoothing' : 'Make smoother'}
                 </button>
-              )}
-              <button
-                className="button full danger"
-                onClick={() => {
-                  stop();
+                <button
+                  className="button full"
+                  onClick={() => openRecorder(detail.instrument, detail.id)}
+                >
+                  <Mic size={18} /> Record again
+                </button>
+                {detail.original && (
+                  <button
+                    className="button full"
+                    onClick={() =>
+                      download(
+                        detail.original!,
+                        `${safeFilename(detail.name)}-original.wav`,
+                      )
+                    }
+                  >
+                    <Download size={18} /> Save original recording
+                  </button>
+                )}
+                <button
+                  className="button full danger"
+                  onClick={() => {
+                    stop();
 
-                  updateSong((s) => ({
-                    ...s,
-                    tracks: s.tracks.filter((t) => t.id !== detail.id),
-                    sections: s.sections?.map((section) => ({
-                      ...section,
-                      trackIds: section.trackIds.filter(
-                        (id) => id !== detail.id,
-                      ),
-                    })),
-                  }));
-                  setDetailId(null);
-                }}
-              >
-                <Trash2 size={18} /> Remove part
-              </button>
+                    updateSong((s) => ({
+                      ...s,
+                      tracks: s.tracks.filter((t) => t.id !== detail.id),
+                      clips: s.clips?.filter((c) => c.trackId !== detail.id),
+                      sections: s.sections?.map((section) => ({
+                        ...section,
+                        trackIds: section.trackIds.filter(
+                          (id) => id !== detail.id,
+                        ),
+                      })),
+                    }));
+                    setDetailId(null);
+                  }}
+                >
+                  <Trash2 size={18} /> Remove part
+                </button>
+              </details>
             </div>
           )}
         </DialogContent>

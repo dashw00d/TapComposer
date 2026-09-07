@@ -1,3 +1,4 @@
+import { songClips } from './clips';
 import { sectionExpression } from './expression';
 import { chordAt, inferHarmony } from './harmony';
 import { buildIntent } from './analyze';
@@ -49,6 +50,22 @@ export function keepIdea(song: Song, track: Track, context: SongContext): Song {
   return composeSong({
     ...song,
     context,
+    clips:
+      song.clips && !replacing
+        ? [
+            ...song.clips,
+            ...songClips({
+              ...song,
+              clips: undefined,
+              tracks: [track],
+              sections: song.sections?.map((section) => ({
+                ...section,
+                trackIds: section.pinned ? [] : [track.id],
+                parts: undefined,
+              })),
+            }).map((c) => ({ ...c, id: crypto.randomUUID() })),
+          ].slice(0, 576)
+        : song.clips,
     sections: song.sections?.map((section) => ({
       ...section,
       trackIds:
@@ -416,6 +433,20 @@ export function composeSong(
   }
   return {
     ...song,
+    clips: input.clips?.flatMap((clip) => {
+      if (tracks.some((t) => t.id === clip.trackId)) return [clip];
+      const previous = input.tracks.find((t) => t.id === clip.trackId);
+      const replacement =
+        supporting.find((t) => t.instrument === previous?.instrument) ??
+        (previous?.generated &&
+        previous.instrument !== 'drums' &&
+        previous.instrument !== 'bass'
+          ? supporting.find(
+              (t) => t.instrument !== 'drums' && t.instrument !== 'bass',
+            )
+          : undefined);
+      return replacement ? [{ ...clip, trackId: replacement.id }] : [];
+    }),
     tracks,
     sections,
     compose: settings,
@@ -436,12 +467,29 @@ export function sectionStart(song: Song, id: string): number {
 }
 /** Materialize sections through a shared path for playback, waveform, WAV, MP3, and MIDI. */
 export function arrangedTracks(song: Song, onlySection?: string): Track[] {
+  if (song.clips && onlySection) {
+    const section = song.sections?.find((s) => s.id === onlySection);
+    if (!section) return [];
+    const start = sectionStart(song, onlySection) * beatSeconds(song.context);
+    const duration = section.bars * 4 * beatSeconds(song.context);
+    return arrangedTracks(song).map((track) => ({
+      ...track,
+      duration,
+      events: track.events
+        .filter((e) => e.time >= start && e.time < start + duration)
+        .map((e) => ({
+          ...e,
+          time: e.time - start,
+          duration: Math.min(e.duration, start + duration - e.time),
+        })),
+    }));
+  }
   const beat = beatSeconds(song.context),
     sections = (song.sections ?? []).filter(
       (s) => !onlySection || s.id === onlySection,
     );
   const anySolo = song.tracks.some((t) => t.solo && !t.muted);
-  if (!sections.length)
+  if (!sections.length && !song.clips)
     return song.tracks.map((t) => {
       const scale =
         (t.sourceTempo ?? song.context?.tempo ?? 100) /
@@ -458,20 +506,48 @@ export function arrangedTracks(song: Song, onlySection?: string): Track[] {
         volume: (t.volume ?? 1) * (song.masterVolume ?? 0.85),
       };
     });
-  const length = sections.reduce((sum, s) => sum + s.bars * 4, 0);
+  const length = song.clips
+    ? Math.max(0, ...song.clips.map((c) => c.startBeat + c.lengthBeats))
+    : sections.reduce((sum, s) => sum + s.bars * 4, 0);
   return song.tracks.map((track) => {
     const events: PerformanceEvent[] = [];
     const sourceBeat = 60 / (track.sourceTempo ?? song.context?.tempo ?? 100);
     const patternLength = patternBeats(track, song.context);
-    let start = 0;
-    for (const section of sections) {
-      const sectionBeats = section.bars * 4;
-      const setting = section.parts?.[track.id] ?? {
-        offsetBeats: 0,
-        repeat: true,
-        transpose: 0,
-      };
-      if (section.trackIds.includes(track.id))
+    let cursor = 0;
+    const segments = song.clips
+      ? song.clips
+          .filter((c) => c.trackId === track.id)
+          .map((clip) => {
+            let boundary = 0;
+            const section = sections.find((s) => {
+              boundary += s.bars * 4;
+              return clip.startBeat < boundary;
+            });
+            return {
+              start: clip.startBeat,
+              sectionBeats: clip.lengthBeats,
+              energy: section?.energy ?? 1,
+              included: true,
+              setting: { ...clip, offsetBeats: 0 },
+            };
+          })
+      : sections.map((section) => {
+          const start = cursor;
+          cursor += section.bars * 4;
+          return {
+            start,
+            sectionBeats: section.bars * 4,
+            energy: section.energy,
+            included: section.trackIds.includes(track.id),
+            setting: section.parts?.[track.id] ?? {
+              offsetBeats: 0,
+              repeat: true,
+              transpose: 0,
+            },
+          };
+        });
+    for (const { start, sectionBeats, energy, setting, included } of segments) {
+      if (included)
         for (
           let cycle = setting.offsetBeats;
           cycle < sectionBeats;
@@ -493,7 +569,7 @@ export function arrangedTracks(song: Song, onlySection?: string): Track[] {
               time: (start + at) * beat,
               duration: Math.max(0.02, end * beat),
               velocity: clamp(
-                event.velocity * (0.62 + section.energy * 0.38),
+                event.velocity * (0.62 + energy * 0.38),
                 0.001,
                 1,
               ),
@@ -506,7 +582,6 @@ export function arrangedTracks(song: Song, onlySection?: string): Track[] {
               ),
             });
           }
-      start += sectionBeats;
     }
     return {
       ...track,
@@ -553,19 +628,33 @@ export function changeInstrument(
   context: SongContext,
 ): Track {
   const arrangement = resolveIntent(
-    track.intent,
+    track.edited
+      ? {
+          ...track.intent,
+          duration: track.duration,
+          events: track.events.map((e) => ({
+            time: e.time,
+            duration: e.duration,
+            pitch: track.instrument === 'drums' ? null : e.note,
+            confidence: 1,
+            intensity: Math.max(0, Math.min(1, (e.velocity - 0.12) / 0.82)),
+          })),
+        }
+      : track.intent,
     instrument,
     { ...context, tempo: track.sourceTempo ?? context.tempo },
     track.smoother,
     true,
+    track.edited ?? false,
   );
   return {
     ...track,
     ...arrangement,
+    ...(track.edited && track.instrument !== 'drums' && instrument !== 'drums'
+      ? { events: track.events, duration: track.duration }
+      : {}),
     instrument,
-    name: track.generated
-      ? `${instrument[0].toUpperCase() + instrument.slice(1)} idea`
-      : track.name,
+    name: track.name,
     ...(track.generated ? { pinned: true, edited: true } : {}),
   };
 }

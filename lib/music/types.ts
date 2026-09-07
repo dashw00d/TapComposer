@@ -83,6 +83,7 @@ export interface PremiumTake {
   duration: number;
 }
 export interface Song {
+  clips?: ArrangementClip[];
   harmonyPinned?: boolean;
   familyId?: string;
   branchedFrom?: string;
@@ -97,6 +98,16 @@ export interface Song {
   sections?: SongSection[];
   compose?: ComposeSettings;
   masterVolume?: number;
+}
+export interface ArrangementClip {
+  id: string;
+  trackId: string;
+  startBeat: number;
+  lengthBeats: number;
+  repeat: boolean;
+  transpose: number;
+  fadeInBeats?: number;
+  fadeOutBeats?: number;
 }
 export const MAX_SECONDS = 30;
 export const MAX_TRACKS = 24;

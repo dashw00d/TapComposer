@@ -314,20 +314,27 @@ export function PremiumStudio({
                   onChange={(e) => setDirection(e.target.value)}
                   placeholder="Warm piano, intimate strings, a gentle late-night groove…"
                 />
-                <div className="fidelity-label">
-                  <span>More adventurous</span>
-                  <span>Closer to my song</span>
-                </div>
-                <Slider
-                  aria-label="Follow my arrangement"
-                  min={0.5}
-                  max={1}
-                  step={0.05}
-                  value={[strength]}
-                  onValueChange={(v) =>
-                    setStrength(Array.isArray(v) ? v[0] : v)
-                  }
-                />
+                <details className="gentle-details">
+                  <summary>How closely should it follow my song?</summary>
+                  <p>
+                    Lower allows more reinterpretation; higher asks the
+                    performance to stay closer to your arrangement.
+                  </p>
+                  <div className="fidelity-label">
+                    <span>More adventurous</span>
+                    <span>Closer to my song</span>
+                  </div>
+                  <Slider
+                    aria-label="Follow my arrangement"
+                    min={0.5}
+                    max={1}
+                    step={0.05}
+                    value={[strength]}
+                    onValueChange={(v) =>
+                      setStrength(Array.isArray(v) ? v[0] : v)
+                    }
+                  />
+                </details>
               </div>
               <div className="premium-actions">
                 <button

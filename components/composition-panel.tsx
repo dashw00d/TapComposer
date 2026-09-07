@@ -44,6 +44,7 @@ interface Props {
   update: (change: (song: Song) => Song) => void;
   onSeek: (seconds: number) => void;
   position: number;
+  showSections?: boolean;
   onPropose?: (label: string, next: Song, retry?: (song: Song) => Song) => void;
 }
 export function CompositionPanel({
@@ -52,6 +53,7 @@ export function CompositionPanel({
   onSeek,
   position,
   onPropose,
+  showSections = true,
 }: Props) {
   const resize = useRef<{
     id: string;
@@ -88,8 +90,8 @@ export function CompositionPanel({
     >
       <div className="arranger-heading">
         <div>
-          <p className="eyebrow">YOUR IDEA. A WHOLE SONG.</p>
-          <h2>Give it somewhere to go.</h2>
+          <p className="eyebrow">A LITTLE HELP</p>
+          <h2>Shape the backing</h2>
         </div>
         <button
           className="button primary"
@@ -111,325 +113,345 @@ export function CompositionPanel({
           {sections.length ? 'Try another version' : 'Build my song'}
         </button>
       </div>
-      <div className="feel-controls">
-        <div className="feel-choice">
-          <label htmlFor="song-feel">The feeling</label>
-          <Select
-            value={settings.feel}
-            onValueChange={(value) => {
-              if (value) update((s) => composeSong(s, { feel: value as Feel }));
-            }}
-          >
-            <SelectTrigger id="song-feel" className="feel-select">
-              <SelectValue>
-                {FEELS.find((f) => f.id === settings.feel)?.label}
-              </SelectValue>
-            </SelectTrigger>
-            <SelectContent>
-              {FEELS.map((feel) => (
-                <SelectItem key={feel.id} value={feel.id}>
-                  {feel.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-        <div className="macro-control">
-          <label htmlFor="energy-control">
-            A little calmer <span>More energy</span>
-          </label>
-          <Slider
-            id="energy-control"
-            aria-label="Song energy"
-            key={`energy-${settings.energy}`}
-            defaultValue={[settings.energy * 100]}
-            min={20}
-            max={100}
-            step={10}
-            onValueCommitted={(value) =>
-              update((s) =>
-                composeSong(s, {
-                  energy: (Array.isArray(value) ? value[0] : value) / 100,
-                }),
-              )
-            }
-          />
-        </div>
-        <div className="macro-control">
-          <label htmlFor="speed-control">
-            Take it easy <span>Pick it up</span>
-          </label>
-          <Slider
-            id="speed-control"
-            aria-label="Song speed"
-            key={`tempo-${song.context?.tempo}`}
-            defaultValue={[song.context?.tempo ?? 100]}
-            min={55}
-            max={170}
-            step={1}
-            onValueCommitted={(value) =>
-              update((s) => ({
-                ...s,
-                context: {
-                  ...(s.context ?? { key: 0, mode: 'major', confidence: 0 }),
-                  tempo: Array.isArray(value) ? value[0] : value,
-                },
-              }))
-            }
-          />
-        </div>
-      </div>
-      <details className="gentle-details harmony-keep">
-        <summary>Keep the harmony</summary>
-        <label>
-          <Switch
-            checked={song.harmonyPinned ?? false}
-            onCheckedChange={(harmonyPinned) =>
-              update((s) => ({ ...s, harmonyPinned }))
-            }
-          />{' '}
-          Keep these chords when adding ideas or trying another version
-        </label>
-      </details>
-      {!!sections.length && (
-        <JourneyEditor
-          key={JSON.stringify(sections.map((s) => [s.id, s.energy, s.pinned]))}
-          song={song}
-          onPropose={propose}
-        />
-      )}
-      <p className="arranger-hint">
-        <Sparkles size={15} />
-        {FEELS.find((f) => f.id === settings.feel)?.description} Your own
-        recordings stay intact.
-      </p>
-      {sections.length > 0 && (
-        <p className="arrangement-help">
-          Click a part to bring it in or out. Drag section titles to reorder;
-          drag their right edge to change length.
+      <details className="arrangement-drawer">
+        <summary>Song settings</summary>
+        <p className="control-help">
+          Change the style and pace. Your note edits stay protected.
         </p>
-      )}
-      {sections.length > 0 && (
-        <div className="song-map" aria-label="Song sections">
-          {sections.map((section, index) => {
-            const start =
-                sectionStart(song, section.id) * beatSeconds(song.context),
-              end = start + section.bars * 4 * beatSeconds(song.context);
-            return (
-              <div
-                className={`section-card ${position >= start && position < end ? 'current-section' : ''}`}
-                key={section.id}
-                onDragOver={(e) => e.preventDefault()}
-                onDrop={(e) => {
-                  e.preventDefault();
-                  const id = e.dataTransfer.getData('text/tapcomposer-section');
-                  update((s) => reorderSection(s, id, section.id));
-                }}
-              >
-                <button
-                  className="section-seek"
-                  draggable
-                  onDragStart={(e) => {
-                    e.dataTransfer.setData(
+        <div className="feel-controls">
+          <div className="feel-choice">
+            <label htmlFor="song-feel">The feeling</label>
+            <Select
+              value={settings.feel}
+              onValueChange={(value) => {
+                if (value)
+                  update((s) => composeSong(s, { feel: value as Feel }));
+              }}
+            >
+              <SelectTrigger id="song-feel" className="feel-select">
+                <SelectValue>
+                  {FEELS.find((f) => f.id === settings.feel)?.label}
+                </SelectValue>
+              </SelectTrigger>
+              <SelectContent>
+                {FEELS.map((feel) => (
+                  <SelectItem key={feel.id} value={feel.id}>
+                    {feel.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="macro-control">
+            <p className="control-help">
+              Fewer, softer notes ↔ fuller, busier backing
+            </p>
+            <label htmlFor="energy-control">
+              Backing intensity{' '}
+              <span>{Math.round(settings.energy * 100)}%</span>
+            </label>
+            <Slider
+              id="energy-control"
+              aria-label="Song energy"
+              key={`energy-${settings.energy}`}
+              defaultValue={[settings.energy * 100]}
+              min={20}
+              max={100}
+              step={10}
+              onValueCommitted={(value) =>
+                update((s) =>
+                  composeSong(s, {
+                    energy: (Array.isArray(value) ? value[0] : value) / 100,
+                  }),
+                )
+              }
+            />
+          </div>
+          <div className="macro-control">
+            <p className="control-help">
+              Slower ↔ faster. Moves the whole song together.
+            </p>
+            <label htmlFor="speed-control">
+              Tempo <span>{Math.round(song.context?.tempo ?? 100)} BPM</span>
+            </label>
+            <Slider
+              id="speed-control"
+              aria-label="Song speed"
+              key={`tempo-${song.context?.tempo}`}
+              defaultValue={[song.context?.tempo ?? 100]}
+              min={55}
+              max={170}
+              step={1}
+              onValueCommitted={(value) =>
+                update((s) => ({
+                  ...s,
+                  context: {
+                    ...(s.context ?? { key: 0, mode: 'major', confidence: 0 }),
+                    tempo: Array.isArray(value) ? value[0] : value,
+                  },
+                }))
+              }
+            />
+          </div>
+        </div>
+        <details className="gentle-details harmony-keep">
+          <summary>Keep the harmony</summary>
+          <label>
+            <Switch
+              checked={song.harmonyPinned ?? false}
+              onCheckedChange={(harmonyPinned) =>
+                update((s) => ({ ...s, harmonyPinned }))
+              }
+            />{' '}
+            Keep these chords when adding ideas or trying another version
+          </label>
+        </details>
+        {showSections && !song.clips && !!sections.length && (
+          <JourneyEditor
+            key={JSON.stringify(
+              sections.map((s) => [s.id, s.energy, s.pinned]),
+            )}
+            song={song}
+            onPropose={propose}
+          />
+        )}
+        <p className="arranger-hint">
+          <Sparkles size={15} />
+          {FEELS.find((f) => f.id === settings.feel)?.description} Your own
+          recordings stay intact.
+        </p>
+        {showSections && !song.clips && sections.length > 0 && (
+          <p className="arrangement-help">
+            Click a part to bring it in or out. Drag section titles to reorder;
+            drag their right edge to change length.
+          </p>
+        )}
+        {showSections && !song.clips && sections.length > 0 && (
+          <div className="song-map" aria-label="Song sections">
+            {sections.map((section, index) => {
+              const start =
+                  sectionStart(song, section.id) * beatSeconds(song.context),
+                end = start + section.bars * 4 * beatSeconds(song.context);
+              return (
+                <div
+                  className={`section-card ${position >= start && position < end ? 'current-section' : ''}`}
+                  key={section.id}
+                  onDragOver={(e) => e.preventDefault()}
+                  onDrop={(e) => {
+                    e.preventDefault();
+                    const id = e.dataTransfer.getData(
                       'text/tapcomposer-section',
-                      section.id,
                     );
-                    e.dataTransfer.effectAllowed = 'move';
+                    update((s) => reorderSection(s, id, section.id));
                   }}
-                  onClick={() => onSeek(start)}
-                  title={`Play from ${section.name}`}
                 >
-                  <span>{String(index + 1).padStart(2, '0')}</span>
-                  <strong>
-                    {section.name}
-                    {section.pinned ? ' · kept' : ''}
-                  </strong>
-                  <small>
-                    {resizing?.id === section.id
-                      ? `${resizing.bars} bars`
-                      : `${Math.round(end - start)}s`}
-                  </small>
-                </button>
-                <div className="section-lanes">
-                  {song.tracks.map((track) => (
-                    <button
-                      key={track.id}
-                      className={`section-lane ${section.trackIds.includes(track.id) ? 'included' : ''}`}
-                      style={
-                        {
-                          '--part-color': instrumentInfo(track.instrument)
-                            .color,
-                        } as React.CSSProperties
+                  <button
+                    className="section-seek"
+                    draggable
+                    onDragStart={(e) => {
+                      e.dataTransfer.setData(
+                        'text/tapcomposer-section',
+                        section.id,
+                      );
+                      e.dataTransfer.effectAllowed = 'move';
+                    }}
+                    onClick={() => onSeek(start)}
+                    title={`Play from ${section.name}`}
+                  >
+                    <span>{String(index + 1).padStart(2, '0')}</span>
+                    <strong>
+                      {section.name}
+                      {section.pinned ? ' · kept' : ''}
+                    </strong>
+                    <small>
+                      {resizing?.id === section.id
+                        ? `${resizing.bars} bars`
+                        : `${Math.round(end - start)}s`}
+                    </small>
+                  </button>
+                  <div className="section-lanes">
+                    {song.tracks.map((track) => (
+                      <button
+                        key={track.id}
+                        className={`section-lane ${section.trackIds.includes(track.id) ? 'included' : ''}`}
+                        style={
+                          {
+                            '--part-color': instrumentInfo(track.instrument)
+                              .color,
+                          } as React.CSSProperties
+                        }
+                        aria-label={`${section.trackIds.includes(track.id) ? 'Remove' : 'Add'} ${track.name} ${section.trackIds.includes(track.id) ? 'from' : 'to'} ${section.name}`}
+                        aria-pressed={section.trackIds.includes(track.id)}
+                        onClick={() =>
+                          patch(section.id, (current) => ({
+                            ...current,
+                            trackIds: current.trackIds.includes(track.id)
+                              ? current.trackIds.filter((id) => id !== track.id)
+                              : [...current.trackIds, track.id],
+                          }))
+                        }
+                      >
+                        <i />
+                        {track.name}
+                      </button>
+                    ))}
+                  </div>
+                  <div
+                    className="section-resize"
+                    // A focusable resize handle has separator semantics, unlike a static rule.
+                    // oxlint-disable-next-line jsx-a11y/prefer-tag-over-role
+                    role="separator"
+                    aria-valuenow={section.bars}
+                    aria-valuemin={2}
+                    aria-valuemax={32}
+                    aria-orientation="vertical"
+                    aria-label={`Resize ${section.name}`}
+                    tabIndex={0}
+                    onKeyDown={(e) => {
+                      if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
+                        e.preventDefault();
+                        update((s) =>
+                          resizeSection(
+                            s,
+                            section.id,
+                            section.bars + (e.key === 'ArrowRight' ? 2 : -2),
+                          ),
+                        );
                       }
-                      aria-label={`${section.trackIds.includes(track.id) ? 'Remove' : 'Add'} ${track.name} ${section.trackIds.includes(track.id) ? 'from' : 'to'} ${section.name}`}
-                      aria-pressed={section.trackIds.includes(track.id)}
+                    }}
+                    onPointerDown={(e) => {
+                      if (e.button !== 0) return;
+                      e.currentTarget.setPointerCapture(e.pointerId);
+                      resize.current = {
+                        id: section.id,
+                        x: e.clientX,
+                        bars: section.bars,
+                        next: section.bars,
+                      };
+                    }}
+                    onPointerMove={(e) => {
+                      const r = resize.current;
+                      if (!r || r.id !== section.id) return;
+                      const next = resizeSection(
+                        song,
+                        section.id,
+                        r.bars + Math.round((e.clientX - r.x) / 24) * 2,
+                      ).sections!.find((s) => s.id === section.id)!.bars;
+                      r.next = next;
+                      setResizing({ id: section.id, bars: next });
+                    }}
+                    onPointerUp={(e) => {
+                      const r = resize.current;
+                      if (!r) return;
+                      resize.current = null;
+                      setResizing(null);
+                      e.currentTarget.releasePointerCapture(e.pointerId);
+                      if (r.next !== r.bars)
+                        update((s) => resizeSection(s, r.id, r.next));
+                    }}
+                    onPointerCancel={() => {
+                      resize.current = null;
+                      setResizing(null);
+                    }}
+                  />
+                  <div className="section-actions">
+                    <button
+                      aria-label={`${section.pinned ? 'Release' : 'Keep'} ${section.name}`}
+                      aria-pressed={section.pinned ?? false}
+                      title="Keep this section and its parts during automatic changes"
                       onClick={() =>
-                        patch(section.id, (current) => ({
-                          ...current,
-                          trackIds: current.trackIds.includes(track.id)
-                            ? current.trackIds.filter((id) => id !== track.id)
-                            : [...current.trackIds, track.id],
+                        patch(section.id, (s) => ({ ...s, pinned: !s.pinned }))
+                      }
+                    >
+                      <Pin size={15} />
+                    </button>
+                    <button
+                      aria-label={`Shape ${section.name}`}
+                      onClick={() => setSectionId(section.id)}
+                    >
+                      <Settings2 size={15} />
+                    </button>
+                    <button
+                      aria-label={`Move ${section.name} earlier`}
+                      disabled={index === 0}
+                      onClick={() =>
+                        update((s) => moveSection(s, section.id, -1))
+                      }
+                    >
+                      <ArrowLeft size={15} />
+                    </button>
+                    <button
+                      aria-label={`Move ${section.name} later`}
+                      disabled={index === sections.length - 1}
+                      onClick={() =>
+                        update((s) => moveSection(s, section.id, 1))
+                      }
+                    >
+                      <ArrowRight size={15} />
+                    </button>
+                    <button
+                      aria-label={`Shorten ${section.name}`}
+                      disabled={section.bars <= 2}
+                      onClick={() =>
+                        update((s) =>
+                          resizeSection(s, section.id, section.bars - 2),
+                        )
+                      }
+                    >
+                      <Minus size={15} />
+                    </button>
+                    <button
+                      aria-label={`Lengthen ${section.name}`}
+                      disabled={section.bars >= 32 || totalBeats + 8 > 512}
+                      onClick={() =>
+                        update((s) =>
+                          resizeSection(s, section.id, section.bars + 2),
+                        )
+                      }
+                    >
+                      <Plus size={15} />
+                    </button>
+                    <button
+                      aria-label={`Duplicate ${section.name}`}
+                      disabled={
+                        sections.length >= 12 ||
+                        totalBeats + section.bars * 4 > 512
+                      }
+                      onClick={() =>
+                        update((s) => {
+                          const next = [...(s.sections ?? [])];
+                          next.splice(index + 1, 0, {
+                            ...section,
+                            id: crypto.randomUUID(),
+                            name: `${section.name} again`,
+                          });
+                          return { ...s, sections: next };
+                        })
+                      }
+                    >
+                      <Copy size={15} />
+                    </button>
+                    <button
+                      aria-label={`Remove ${section.name}`}
+                      disabled={sections.length <= 1}
+                      onClick={() =>
+                        update((s) => ({
+                          ...s,
+                          sections: s.sections?.filter(
+                            (current) => current.id !== section.id,
+                          ),
                         }))
                       }
                     >
-                      <i />
-                      {track.name}
+                      <Trash2 size={15} />
                     </button>
-                  ))}
+                  </div>
                 </div>
-                <div
-                  className="section-resize"
-                  // A focusable resize handle has separator semantics, unlike a static rule.
-                  // oxlint-disable-next-line jsx-a11y/prefer-tag-over-role
-                  role="separator"
-                  aria-valuenow={section.bars}
-                  aria-valuemin={2}
-                  aria-valuemax={32}
-                  aria-orientation="vertical"
-                  aria-label={`Resize ${section.name}`}
-                  tabIndex={0}
-                  onKeyDown={(e) => {
-                    if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
-                      e.preventDefault();
-                      update((s) =>
-                        resizeSection(
-                          s,
-                          section.id,
-                          section.bars + (e.key === 'ArrowRight' ? 2 : -2),
-                        ),
-                      );
-                    }
-                  }}
-                  onPointerDown={(e) => {
-                    if (e.button !== 0) return;
-                    e.currentTarget.setPointerCapture(e.pointerId);
-                    resize.current = {
-                      id: section.id,
-                      x: e.clientX,
-                      bars: section.bars,
-                      next: section.bars,
-                    };
-                  }}
-                  onPointerMove={(e) => {
-                    const r = resize.current;
-                    if (!r || r.id !== section.id) return;
-                    const next = resizeSection(
-                      song,
-                      section.id,
-                      r.bars + Math.round((e.clientX - r.x) / 24) * 2,
-                    ).sections!.find((s) => s.id === section.id)!.bars;
-                    r.next = next;
-                    setResizing({ id: section.id, bars: next });
-                  }}
-                  onPointerUp={(e) => {
-                    const r = resize.current;
-                    if (!r) return;
-                    resize.current = null;
-                    setResizing(null);
-                    e.currentTarget.releasePointerCapture(e.pointerId);
-                    if (r.next !== r.bars)
-                      update((s) => resizeSection(s, r.id, r.next));
-                  }}
-                  onPointerCancel={() => {
-                    resize.current = null;
-                    setResizing(null);
-                  }}
-                />
-                <div className="section-actions">
-                  <button
-                    aria-label={`${section.pinned ? 'Release' : 'Keep'} ${section.name}`}
-                    aria-pressed={section.pinned ?? false}
-                    title="Keep this section and its parts during automatic changes"
-                    onClick={() =>
-                      patch(section.id, (s) => ({ ...s, pinned: !s.pinned }))
-                    }
-                  >
-                    <Pin size={15} />
-                  </button>
-                  <button
-                    aria-label={`Shape ${section.name}`}
-                    onClick={() => setSectionId(section.id)}
-                  >
-                    <Settings2 size={15} />
-                  </button>
-                  <button
-                    aria-label={`Move ${section.name} earlier`}
-                    disabled={index === 0}
-                    onClick={() =>
-                      update((s) => moveSection(s, section.id, -1))
-                    }
-                  >
-                    <ArrowLeft size={15} />
-                  </button>
-                  <button
-                    aria-label={`Move ${section.name} later`}
-                    disabled={index === sections.length - 1}
-                    onClick={() => update((s) => moveSection(s, section.id, 1))}
-                  >
-                    <ArrowRight size={15} />
-                  </button>
-                  <button
-                    aria-label={`Shorten ${section.name}`}
-                    disabled={section.bars <= 2}
-                    onClick={() =>
-                      update((s) =>
-                        resizeSection(s, section.id, section.bars - 2),
-                      )
-                    }
-                  >
-                    <Minus size={15} />
-                  </button>
-                  <button
-                    aria-label={`Lengthen ${section.name}`}
-                    disabled={section.bars >= 32 || totalBeats + 8 > 512}
-                    onClick={() =>
-                      update((s) =>
-                        resizeSection(s, section.id, section.bars + 2),
-                      )
-                    }
-                  >
-                    <Plus size={15} />
-                  </button>
-                  <button
-                    aria-label={`Duplicate ${section.name}`}
-                    disabled={
-                      sections.length >= 12 ||
-                      totalBeats + section.bars * 4 > 512
-                    }
-                    onClick={() =>
-                      update((s) => {
-                        const next = [...(s.sections ?? [])];
-                        next.splice(index + 1, 0, {
-                          ...section,
-                          id: crypto.randomUUID(),
-                          name: `${section.name} again`,
-                        });
-                        return { ...s, sections: next };
-                      })
-                    }
-                  >
-                    <Copy size={15} />
-                  </button>
-                  <button
-                    aria-label={`Remove ${section.name}`}
-                    disabled={sections.length <= 1}
-                    onClick={() =>
-                      update((s) => ({
-                        ...s,
-                        sections: s.sections?.filter(
-                          (current) => current.id !== section.id,
-                        ),
-                      }))
-                    }
-                  >
-                    <Trash2 size={15} />
-                  </button>
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      )}
+              );
+            })}
+          </div>
+        )}
+      </details>
       <Dialog
         open={!!selectedSection}
         onOpenChange={(open) => {
@@ -600,7 +622,11 @@ export function MixControls({
 }) {
   return (
     <div className="mix-panel">
-      <p className="eyebrow">A LITTLE BALANCE</p>
+      <h3>Volume &amp; balance</h3>
+      <p className="control-help">
+        Level makes each instrument quieter or louder. Balance places it left or
+        right. Solo lets you hear one part on its own.
+      </p>
       {song.tracks.map((track) => (
         <div className="mix-row" key={track.id}>
           <span>{track.name}</span>

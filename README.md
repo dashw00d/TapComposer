@@ -1,6 +1,6 @@
 # TapComposer
 
-Tap or hum an idea. TapComposer interprets it through an instrument, adds backing and builds a song. A compact studio lets you shape the result without entering notes or setting up music theory.
+Tap or hum an idea. TapComposer interprets it through an instrument, adds backing and builds a song. A compact studio lets you shape the result with a visual playlist and piano roll, while timing and composition stay automatic.
 
 ## Run
 
@@ -23,10 +23,10 @@ The local server reads `.env.local` (see `.env.example`). The configured GPU ser
 1. Start with **Hum an idea** or **Tap a rhythm**, then audition piano, drums, bass, guitar, strings, or synth. Expand the instrument drawer to choose a sound before recording. Every instrument accepts every input.
 2. For humming or desk taps, click **Start recording**. The microphone and sounds prepare first; a visible **3–2–1 → Start** countdown leads into capture. Click **Stop recording** when finished, or cancel during the countdown. Capture and backing share an audio-clock start, and leading silence stays part of the take. Hear an interpretation, retry or smooth it, then keep it. Optional controls layer several instruments from the same recording and audition them with the song. The first idea establishes a pulse and provisional key. Taps become chords, bass movement or a melody according to the chosen instrument.
 3. Keeping an idea automatically creates complementary backing and a five-section song. A hummed melody informs the harmony; your original performance and recording remain available.
-4. Choose a feel, change the energy, or try another version. Section order, length, instrument membership and your recorded ideas survive regeneration.
-5. Drag section titles to reorder and right edges to resize; buttons and arrow keys offer the same changes. Section options include names, entrances, smooth fades, repetition and octave changes. **Shape the journey** reveals a drawable energy curve, accessible sliders and presets that shape dynamics and backing; suggesting lengths is optional.
-6. Select a part for musical directions: simpler, more movement, answer the melody, come in later, or leave more space. Suggested changes and regenerated arrangements open a Before/Proposed comparison with Keep, Go back and, for arrangements, Try another. Accepted directions are kept automatically and remain undoable. Change any idea's instrument without recording again. Preview, rename, duplicate, smooth, replace or remove parts. Balance exposes level, pan, mute, solo and overall volume.
-7. Play the song or its ingredients, seek to a section or position, repeat and adjust song speed. Save the full arrangement as stereo WAV, 192 kbps MP3, or MIDI. Download a project backup to move an editable song, including original audio, to another browser.
+4. The playlist shows tracks down the left and bars across the top. Drag colored blocks to move them; pull their right edge to shorten or repeat them. Click a bar number to play from there. Select a block to duplicate or delete it, or double-click an empty lane to add one. Deleting a block keeps its source part available.
+5. Click a block or track name to open its notes underneath. Drag notes vertically for pitch and horizontally for timing; pull the right edge for length. Double-click empty space to add a note. Drums have named kick, snare and hi-hat rows. Select a note and press **Delete note** to remove it. **Trim empty edges** removes leading and trailing silence from the editable part. These edits apply to every block of that part; original audio and musical intent remain intact.
+6. Choose **Sound** beside the notes to change the instrument, including automatic backing such as Warm chords. Manual note edits stay protected through sound changes and automatic composition. **More options** contains musical directions, renaming, copying a part, replacing its recording and removal. **Volume & balance** reveals level, pan, mute, solo and overall volume. **Song settings** contains feel, backing intensity, tempo and harmony protection. **Try another version** previews changed backing before you keep it; manually placed blocks stay in place.
+7. Play, seek and repeat the song. Save the full arrangement as stereo WAV, 192 kbps MP3, or MIDI. Download a project backup to move an editable song, including original audio and manually placed blocks, to another browser.
 
 8. In Premium, give the song a studio finish. Add optional direction, choose how closely it follows the arrangement, then make a take. Compare the editable arrangement and saved takes at a shared playback position with RMS listening levels matched by attenuation, save WAV, or keep arranging and render again. Up to three takes survive browser saves and editable project backups. Free mode keeps all local tools and makes no audio uploads.
 
@@ -34,30 +34,34 @@ The local server reads `.env.local` (see `.env.example`). The configured GPU ser
 
 The app supports 24 parts, 30 seconds per take, 12 sections and at most 512 beats of arrangement. These are resource limits rather than setup choices. Songs autosave locally; undo/redo retains up to 50 edits. Existing two-instrument songs retain their patterns and recordings and can be expanded with **Build my song**.
 
+Keyboard in the playlist: left/right arrows move a selected block by a beat; Shift plus arrows resize it; Delete removes it. In the note grid, arrows change pitch or timing, Shift plus left/right changes length, and Delete removes a note. Each drag is one undo step.
+
 Keyboard: Space plays/stops when focus is outside an interactive control; Ctrl/Command Z undoes; Shift Ctrl/Command Z redoes; Ctrl/Command S downloads a project backup; Escape stops playback. Dialogs, sliders and recording controls support keyboard interaction.
 
 ## Architecture
 
 Free mode runs music processing on the device. Premium adds ACE-Step XL cover rendering through the local GPU gateway. Both experiences are tested locally; the Premium label represents the future product tier. Account billing is not implemented. See [inference/README.md](./inference/README.md) for the GPU service, configuration, limits and operational requirements.
 
-| Module                             | Responsibility                                                                             |
-| ---------------------------------- | ------------------------------------------------------------------------------------------ |
-| `public/worklets/capture.js`       | Audio-clock capture, meter, explicit start, 30-second cap; no microphone monitoring        |
-| `lib/music/capture.ts`             | Permission, cancellation, original WAV preservation, analysis worker                       |
-| `lib/music/neural.ts`              | CREPE Tiny inference, voice resampling, confidence filtering and melodic segmentation      |
-| `lib/music/analysis-client.ts`     | Warm worker reuse, progress, cancellation and bounded fallback                             |
-| `lib/music/analyze.ts`             | YIN fallback, shared note segmentation and adaptive tap onset detection                    |
-| `lib/music/resolve.ts`             | Pulse/key estimates, soft correction and instrument-specific interpretation                |
-| `lib/music/harmony.ts`             | Melody-weighted diatonic harmony                                                           |
-| `lib/music/composition.ts`         | Backing, feel/variation, section structure, tempo scaling and shared arranged event stream |
-| `lib/music/audio.ts`               | Samples, drum/synth DSP, audio-clock scheduling, stereo mix, effects and offline rendering |
-| `lib/music/export.worker.ts`       | MP3 encoding away from the interface thread                                                |
-| `lib/music/project.ts`, `midi.ts`  | Validated editable project backup/import and portable MIDI                                 |
-| `lib/music/storage.ts`             | IndexedDB songs/original audio and migration of source tempo                               |
-| `hooks/use-song-history.ts`        | Snapshot undo/redo retaining original audio by reference                                   |
-| `components/recorder.tsx`          | Capture and take review                                                                    |
-| `components/composition-panel.tsx` | Automatic composition, optional section arrangement and balance                            |
-| `components/composer.tsx`          | Studio, transport, library, instrument changes and export                                  |
+| Module                                             | Responsibility                                                                             |
+| -------------------------------------------------- | ------------------------------------------------------------------------------------------ |
+| `public/worklets/capture.js`                       | Audio-clock capture, meter, explicit start, 30-second cap; no microphone monitoring        |
+| `lib/music/capture.ts`                             | Permission, cancellation, original WAV preservation, analysis worker                       |
+| `lib/music/neural.ts`                              | CREPE Tiny inference, voice resampling, confidence filtering and melodic segmentation      |
+| `lib/music/analysis-client.ts`                     | Warm worker reuse, progress, cancellation and bounded fallback                             |
+| `lib/music/analyze.ts`                             | YIN fallback, shared note segmentation and adaptive tap onset detection                    |
+| `lib/music/resolve.ts`                             | Pulse/key estimates, soft correction and instrument-specific interpretation                |
+| `lib/music/harmony.ts`                             | Melody-weighted diatonic harmony                                                           |
+| `lib/music/composition.ts`                         | Backing, feel/variation, section structure, tempo scaling and shared arranged event stream |
+| `lib/music/audio.ts`                               | Samples, drum/synth DSP, audio-clock scheduling, stereo mix, effects and offline rendering |
+| `lib/music/export.worker.ts`                       | MP3 encoding away from the interface thread                                                |
+| `lib/music/project.ts`, `midi.ts`                  | Validated editable project backup/import and portable MIDI                                 |
+| `lib/music/storage.ts`                             | IndexedDB songs/original audio and migration of source tempo                               |
+| `hooks/use-song-history.ts`                        | Snapshot undo/redo retaining original audio by reference                                   |
+| `components/song-timeline.tsx`, `note-cleanup.tsx` | Interactive clip playlist, piano roll and drum rows                                        |
+| `lib/music/clips.ts`, `cleanup.ts`                 | Bounded arrangement and note edits preserving source recordings                            |
+| `components/recorder.tsx`                          | Capture and take review                                                                    |
+| `components/composition-panel.tsx`                 | Automatic composition, optional section arrangement and balance                            |
+| `components/composer.tsx`                          | Studio, transport, library, instrument changes and export                                  |
 
 The `MusicalIntent` layer separates human input from instrument performance. Tempo changes scale playback without rewriting source timing. Playback, WAV/MP3 and MIDI use the same arrangement, section membership and mix choices. Section fades use continuous Web Audio gain envelopes; MIDI approximates them with CC11 expression at quarter-beat intervals. Regeneration replaces suggested backing while retaining original ideas and manual structure.
 

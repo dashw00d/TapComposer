@@ -160,6 +160,30 @@ export async function importProject(file: Blob): Promise<Song> {
   });
   if (new Set(tracks.map((t) => t.id)).size !== tracks.length)
     throw new Error('This project has duplicate parts.');
+  if (data.clips !== undefined) {
+    if (
+      !Array.isArray(data.clips) ||
+      data.clips.length > 576 ||
+      !data.clips.every(
+        (clip) =>
+          object(clip) &&
+          typeof clip.id === 'string' &&
+          tracks.some((t) => t.id === clip.trackId) &&
+          number(clip.startBeat, 0, 511.75) &&
+          number(clip.lengthBeats, 0.25, 512) &&
+          (clip.startBeat as number) + (clip.lengthBeats as number) <= 512 &&
+          typeof clip.repeat === 'boolean' &&
+          number(clip.transpose, -24, 24) &&
+          (clip.fadeInBeats === undefined ||
+            number(clip.fadeInBeats, 0, 128)) &&
+          (clip.fadeOutBeats === undefined ||
+            number(clip.fadeOutBeats, 0, 128)),
+      )
+    )
+      throw new Error('This project contains invalid timeline blocks.');
+    if (new Set(data.clips.map((clip) => clip.id)).size !== data.clips.length)
+      throw new Error('This project contains duplicate timeline blocks.');
+  }
   const sections = Array.isArray(data.sections) ? data.sections : [];
   if (sections.length > 12)
     throw new Error('This project has too many sections.');
