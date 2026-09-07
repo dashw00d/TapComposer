@@ -10,7 +10,11 @@ The plan names Basic Pitch, CREPE/torchcrepe and ACE-Step. This update downloads
 - Basic Pitch: [pinned HF mirror](https://huggingface.co/daserge/basic-pitch-onnx/tree/2633e680fb5a1c551cee4905410115b6715862f6); SHA-256 matches its published hash for Spotify's ICASSP 2022 ONNX model. Official [Spotify documentation](https://github.com/spotify/basic-pitch) and [model card](https://huggingface.co/spotify/basic-pitch). Apache-2.0.
 - ACE-Step: [official model repository](https://huggingface.co/ACE-Step/Ace-Step1.5) and [runtime documentation](https://huggingface.co/docs/diffusers/api/pipelines/ace_step). It is a separate generative audio system, not a replacement for low-latency pitch capture.
 
-## Controlled comparison
+## Real voice evaluation (September 7, 2026)
+
+A repeatable human-recording benchmark and local listening bank now exist. See [VOICE_EVALUATION.md](./VOICE_EVALUATION.md) for the corpus, commands, measured failures and rejected candidate. Across 40 annotated recordings, the current detector averages about 94.7% frame pitch recall but only 68.3% pitch-and-onset note F1 at 100 ms. These measurements supersede synthetic fixtures as evidence of practical vocal quality. Recognition behavior has not been changed in this evaluation pass.
+
+## Controlled synthetic comparison
 
 Measured on this development machine with the same ONNX Runtime Web WASM backend used in the app, one CPU thread. These are synthetic fixtures at four known pitches, not recordings from users or a general vocal accuracy benchmark. Correct means a detected pitch within half a semitone, including confidence gating; raw frame outputs were compared before the app's note segmentation. Missing-fundamental fixtures contain only upper harmonics. Basic Pitch was evaluated with a simple strongest-note frame decoder, not its full polyphonic note decoder.
 
@@ -31,4 +35,4 @@ Tiny was selected for the monophonic humming path because it handled the upper-h
 - Real model regression: six quiet synthetic hummed notes are recovered in order, while the previous YIN gate finds zero. Silence, DC and deterministic broadband noise produce no notes; 44.1/48 kHz input retains pitch and duration. Worker reuse, progress, error fallback and cancellation are separately tested.
 - All model/runtime assets are served from the app's own origin. No original recordings leave the browser. Free mode makes no audio inference uploads. Premium explicitly uploads the arranged instrumental WAV to its inference service.
 
-Real-voice, room-noise and mobile-device evaluation is still needed to measure practical accuracy and latency. This integration is a tested recognition improvement, not a claim of perfect transcription or universal model superiority.
+The new real-voice benchmark exposes substantial note-boundary errors. Room-noise, actual browser microphone processing, freeform humming with manual note labels, and mobile-device evaluation are still needed. The older synthetic checks are regressions, not proof of practical transcription accuracy.

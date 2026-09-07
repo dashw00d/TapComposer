@@ -82,7 +82,7 @@ export function decodeCrepe(
   return { pitch: 69 + 12 * Math.log2(hz / 440), confidence };
 }
 
-export async function neuralHum(
+export async function neuralPitchFrames(
   input: Float32Array,
   sampleRate: number,
   session: InferenceSession,
@@ -139,6 +139,23 @@ export async function neuralHum(
     progress(clamp((start + n) / count, 0, 1));
     await new Promise<void>((resolve) => setTimeout(resolve, 0));
   }
+  return frames;
+}
+
+export async function neuralHum(
+  input: Float32Array,
+  sampleRate: number,
+  session: InferenceSession,
+  progress: (value: number) => void = () => {},
+  budgetMs = 14000,
+) {
+  const frames = await neuralPitchFrames(
+    input,
+    sampleRate,
+    session,
+    progress,
+    budgetMs,
+  );
   return {
     ...humFramesToIntent(frames, HOP / RATE, input.length / sampleRate),
     analyzer: 'crepe-tiny' as const,

@@ -15,7 +15,11 @@
     "typecheck": "tsc --noEmit",
     "check": "npm run typecheck && npm run lint && npm test",
     "predev": "node scripts/prepare-inference.mjs",
-    "prebuild": "node scripts/prepare-inference.mjs"
+    "prebuild": "node scripts/prepare-inference.mjs",
+    "voices:download": "python3 scripts/download-voice-benchmark.py",
+    "voices:benchmark": "tsx scripts/benchmark-voices.ts",
+    "voices:report": "node scripts/voice-report.mjs",
+    "voices:serve": "python3 -m http.server 3002 --bind 127.0.0.1 --directory outputs/voice-benchmark"
   },
   "dependencies": {
     "@base-ui/react": "1.7.0",

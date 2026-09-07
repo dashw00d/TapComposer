@@ -1,0 +1,140 @@
+--- a/lib/music/analyze.ts
++++ b/lib/music/analyze.ts
+@@ -155,71 +155,71 @@
+       };
+   }
+   const events: IntentEvent[] = [];
+-  let group: PitchFrame[] = [],
+-    pending: PitchFrame[] = [];
+-  const baseline = () => median(group.slice(-25).map((f) => f.pitch));
+-  const absorb = () => {
+-    const pitch = baseline();
+-    group.push(...pending.map((f) => ({ ...f, pitch })));
+-    pending = [];
+-  };
+-  const flush = () => {
+-    if (group.length * hopSeconds >= 0.06) {
+-      events.push({
+-        time: group[0].time,
+-        duration: Math.min(
+-          duration - group[0].time,
+-          group[group.length - 1].time - group[0].time + hopSeconds,
+-        ),
+-        pitch: median(group.map((x) => x.pitch)),
+-        confidence:
+-          group.reduce((sum, x) => sum + x.confidence, 0) / group.length,
+-        intensity: clamp(
+-          Math.sqrt(group.reduce((sum, x) => sum + x.rms, 0) / group.length) *
+-            1.7,
+-          0.2,
+-          1,
+-        ),
+-      });
+-    }
+-    group = [];
+-  };
+-  for (const f of smoothed) {
+-    if (!Number.isFinite(f.pitch)) {
+-      if (pending.length) absorb();
+-      if (group.length && f.time - group[group.length - 1].time >= 0.04 - 1e-8)
+-        flush();
+-      continue;
+-    }
+-    if (!group.length) {
+-      group.push(f);
+-      continue;
+-    }
+-    if (f.time - (pending.at(-1) ?? group.at(-1)!).time > 0.08) {
+-      absorb();
+-      flush();
+-      group.push(f);
+-      continue;
+-    }
+-    if (Math.abs(f.pitch - baseline()) <= 0.8) {
+-      absorb();
+-      group.push(f);
+-      continue;
+-    }
+-    if (
+-      pending.length &&
+-      Math.abs(f.pitch - median(pending.map((x) => x.pitch))) > 0.6
+-    )
+-      absorb();
+-    pending.push(f);
+-    // Confirm a new pitch over several frames, but retain its original onset.
+-    if (pending.at(-1)!.time - pending[0].time + hopSeconds >= 0.08 - 1e-8) {
+-      flush();
+-      group = pending;
+-      pending = [];
+-    }
+-  }
+-  if (pending.length) absorb();
+-  flush();
++  const phrases: PitchFrame[][] = [];
++  let phrase: PitchFrame[] = [];
++  for (const frame of smoothed) {
++    if (Number.isFinite(frame.pitch)) phrase.push(frame);
++    else if (phrase.length && frame.time - phrase.at(-1)!.time >= 0.04 - 1e-8) {
++      phrases.push(phrase); phrase = [];
++    }
++  }
++  if (phrase.length) phrases.push(phrase);
++  for (const frames of phrases) {
++    const low = Math.floor(Math.min(...frames.map(f => f.pitch))) - 1;
++    const high = Math.ceil(Math.max(...frames.map(f => f.pitch))) + 1;
++    const states = high - low + 1;
++    let costs = new Float64Array(states);
++    const back: Int16Array[] = [];
++    for (const frame of frames) {
++      const next = new Float64Array(states), pointers = new Int16Array(states);
++      let best = 0;
++      for (let j = 1; j < states; j++) if (costs[j] < costs[best]) best = j;
++      for (let j = 0; j < states; j++) {
++        const stay = costs[j], change = costs[best] + 6 * 0.02 / hopSeconds;
++        pointers[j] = stay <= change ? j : best;
++        next[j] = Math.min(stay, change) + Math.min(3, Math.abs(frame.pitch - (low + j))) ** 2;
++      }
++      costs = next; back.push(pointers);
++    }
++    let best = 0;
++    for (let j = 1; j < states; j++) if (costs[j] < costs[best]) best = j;
++    const path = new Int16Array(frames.length);
++    for (let i = frames.length - 1; i >= 0; i--) { path[i] = best + low; best = back[i][best]; }
++    const runs: {start:number;end:number;pitch:number}[] = [];
++    let start = 0;
++    for (let i = 1; i <= frames.length; i++) if (i === frames.length || path[i] !== path[start]) {
++      runs.push({start,end:i,pitch:path[start]});start=i;
++    }
++    // A transient must last long enough to become an intentional note.
++    for (let i = 0; i < runs.length; i++) {
++      const run = runs[i];
++      if ((run.end-run.start)*hopSeconds >= 0.08 - 1e-8) continue;
++      if (i > 0) { runs[i-1].end = run.end; runs.splice(i--,1); }
++      else if (runs.length > 1) { runs[1].start = run.start; runs.shift(); i--; }
++    }
++    // A short, continuously moving bridge between stable pitches is a slide.
++    // A held intermediate pitch (even a very short one) remains a note.
++    for (let i = 1; i < runs.length - 1; i++) {
++      const run = runs[i], before = runs[i-1], after = runs[i+1];
++      const pitches = frames.slice(run.start,run.end).map(f=>f.pitch);
++      const direction = Math.sign(after.pitch-before.pitch);
++      const moving = pitches.slice(1).filter((p,j)=>direction*(p-pitches[j]) > 0.05).length;
++      if ((run.end-run.start)*hopSeconds <= 0.24 &&
++          direction*(run.pitch-before.pitch)>0 && direction*(after.pitch-run.pitch)>0 &&
++          Math.max(...pitches)-Math.min(...pitches)>0.8 && moving >= (pitches.length-1)*0.8) {
++        before.end=run.end; runs.splice(i--,1);
++      }
++    }
++    for (let i = 1; i < runs.length; i++) if (runs[i-1].pitch === runs[i].pitch) {
++      runs[i-1].end=runs[i].end;runs.splice(i--,1);
++    }
++    for (const run of runs) {
++      const group = frames.slice(run.start,run.end);
++      if (group.length*hopSeconds < 0.06) continue;
++      events.push({time:group[0].time,duration:Math.min(duration-group[0].time,group.at(-1)!.time-group[0].time+hopSeconds),
++        pitch:median(group.map(f=>f.pitch)), confidence:group.reduce((sum,f)=>sum+f.confidence,0)/group.length,
++        intensity:clamp(Math.sqrt(group.reduce((sum,f)=>sum+f.rms,0)/group.length)*1.7,.2,1)});
++    }
++  }
+   return buildIntent('hum', events, duration);
+ }
