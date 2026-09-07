@@ -7,6 +7,25 @@ export interface CaptureSession {
   stop: () => void;
   cancel: () => void;
   startAt: number;
+  currentTime: () => number;
+}
+export function alignCapturedIntent(
+  intent: MusicalIntent,
+  hasBacking: boolean,
+): MusicalIntent {
+  // Counted microphone takes retain the full timeline, including a deliberate
+  // pause before the first note. Only a standalone tap-pad gesture starts on tap.
+  if (intent.source !== 'touch' || hasBacking || !intent.events.length)
+    return intent;
+  const trim = intent.events[0].time;
+  return {
+    ...intent,
+    events: intent.events.map((e) => ({
+      ...e,
+      time: Math.max(0, e.time - trim),
+    })),
+    duration: Math.max(0, intent.duration - trim),
+  };
 }
 export async function beginCapture(
   engine: AudioEngine,
@@ -21,7 +40,7 @@ export async function beginCapture(
   const stream = await navigator.mediaDevices.getUserMedia({
     audio: {
       channelCount: 1,
-      echoCancellation: true,
+      echoCancellation: false,
       noiseSuppression: false,
       autoGainControl: false,
     },
@@ -35,7 +54,11 @@ export async function beginCapture(
     node?.disconnect();
   };
   try {
-    const startAt = context.currentTime + 0.15;
+    // Acquire the device and load the worklet before starting the count-in.
+    // Round to a sample boundary shared by the worklet and backing transport.
+    const startAt =
+      Math.ceil((context.currentTime + 3.1) * context.sampleRate) /
+      context.sampleRate;
     source = context.createMediaStreamSource(stream);
     node = new AudioWorkletNode(context, 'tap-capture', {
       processorOptions: { startAt },
@@ -47,18 +70,25 @@ export async function beginCapture(
       if (event.data.type === 'meter')
         onMeter(event.data.level, event.data.elapsed);
       if (event.data.type === 'complete') {
+        cancelled = true;
         cleanup();
+        node?.port.close();
         onComplete(event.data.pcm, context.sampleRate);
       }
     };
     node.onprocessorerror = () => {
       cleanup();
-      if (!cancelled) onComplete(new Float32Array(), context.sampleRate);
+      if (!cancelled) {
+        cancelled = true;
+        node?.port.close();
+        onComplete(new Float32Array(), context.sampleRate);
+      }
     };
     source.connect(node);
     node.connect(context.destination); // Worklet output is always silence.
     return {
       startAt,
+      currentTime: () => context.currentTime,
       stop: () => node?.port.postMessage('stop'),
       cancel: () => {
         cancelled = true;

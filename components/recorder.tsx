@@ -22,6 +22,7 @@ import {
 import { AudioEngine } from '@/lib/music/audio';
 import {
   beginCapture,
+  alignCapturedIntent,
   microphoneError,
   understandRecording,
   type CaptureSession,
@@ -70,12 +71,12 @@ export function Recorder({
   const [layering, setLayering] = useState(false);
   const [inContext, setInContext] = useState(false);
   const [phase, setPhase] = useState<
-    'ready' | 'requesting' | 'recording' | 'analyzing' | 'review'
+    'ready' | 'requesting' | 'countdown' | 'recording' | 'analyzing' | 'review'
   >('ready');
   const [mode, setMode] = useState<'touch' | 'mic' | 'hum'>(
     instrument === 'drums' ? 'touch' : 'hum',
   );
-  const [micReady, setMicReady] = useState(false);
+  const [countdown, setCountdown] = useState(3);
   const [error, setError] = useState('');
   const [elapsed, setElapsed] = useState(0);
   const [level, setLevel] = useState(0);
@@ -86,8 +87,7 @@ export function Recorder({
   const session = useRef<CaptureSession | null>(null);
   const active = useRef(true),
     serial = useRef(0),
-    phaseRef = useRef(phase),
-    held = useRef(false);
+    phaseRef = useRef(phase);
   const tapEvents = useRef<IntentEvent[]>([]),
     tapStart = useRef(0),
     interval = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -159,16 +159,7 @@ export function Recorder({
       );
       return;
     }
-    // First part defines the clock. Later parts preserve their offset against it.
-    const trim = backing.length === 0 ? intent.events[0].time : 0;
-    const normalized = {
-      ...intent,
-      events: intent.events.map((e) => ({
-        ...e,
-        time: Math.max(0, e.time - trim),
-      })),
-      duration: Math.max(0, intent.duration - trim),
-    };
+    const normalized = alignCapturedIntent(intent, backing.length > 0);
     const hasMelody = song.tracks.some(
       (t) => !t.generated && t.intent.events.some((e) => e.pitch !== null),
     );
@@ -232,32 +223,22 @@ export function Recorder({
       }
     }
   }
-  async function enableMic() {
-    setError('');
-    transition('requesting');
-    try {
-      await engine.prepareCapture();
-      if (!navigator.mediaDevices?.getUserMedia)
-        throw new Error(
-          'Open this app on HTTPS or localhost to use the microphone.',
-        );
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      stream.getTracks().forEach((t) => t.stop());
-      if (active.current) {
-        setMicReady(true);
-        transition('ready');
-      }
-    } catch (e) {
-      if (active.current) {
-        setError(microphoneError(e));
-        transition('ready');
-      }
-    }
+  function cancelCountIn() {
+    serial.current++;
+    session.current?.cancel();
+    session.current = null;
+    if (interval.current) clearInterval(interval.current);
+    interval.current = null;
+    engine.stop();
+    setLevel(0);
+    setElapsed(0);
+    transition('ready');
   }
-  async function startMic(isHold = false) {
+  async function startMic() {
     if (phaseRef.current !== 'ready') return;
     setError('');
     setElapsed(0);
+    setCountdown(3);
     transition('requesting');
     engine.stop();
     const token = ++serial.current;
@@ -266,43 +247,54 @@ export function Recorder({
         instrument,
         ...backing.filter((t) => !t.muted).map((t) => t.instrument),
       ]);
-      if (
-        !active.current ||
-        token !== serial.current ||
-        (isHold && !held.current)
-      ) {
-        if (active.current) transition('ready');
-        return;
-      }
+      if (!active.current || token !== serial.current) return;
       const capture = await beginCapture(
         engine,
         (volume, time) => {
-          if (active.current) {
+          if (active.current && token === serial.current) {
             setLevel(volume);
             setElapsed(time);
           }
         },
-        finishMic,
+        (pcm, rate) => {
+          if (active.current && token === serial.current) {
+            if (interval.current) clearInterval(interval.current);
+            interval.current = null;
+            void finishMic(pcm, rate);
+          }
+        },
       );
-      if (
-        !active.current ||
-        token !== serial.current ||
-        (isHold && !held.current)
-      ) {
+      if (!active.current || token !== serial.current) {
         capture.cancel();
-        if (active.current) transition('ready');
         return;
       }
       session.current = capture;
-      transition('recording');
+      transition('countdown');
+      const tick = () => {
+        if (!active.current || token !== serial.current) return;
+        const remaining = capture.startAt - capture.currentTime();
+        setCountdown(Math.max(0, Math.min(3, Math.ceil(remaining))));
+        if (remaining <= 0) {
+          transition('recording');
+          if (interval.current) clearInterval(interval.current);
+          interval.current = null;
+        }
+      };
+      tick();
+      interval.current = setInterval(tick, 16);
       if (backing.some((t) => !t.muted))
         await engine.play(backing, true, () => {}, capture.startAt);
+      if (!active.current || token !== serial.current) return;
+      if (capture.currentTime() >= capture.startAt) {
+        cancelCountIn();
+        setError(
+          'Getting the audio ready took longer than expected. Start again for a fresh countdown.',
+        );
+      }
     } catch (e) {
-      session.current?.cancel();
-      session.current = null;
-      if (active.current) {
+      if (active.current && token === serial.current) {
+        cancelCountIn();
         setError(microphoneError(e));
-        transition('ready');
       }
     }
   }
@@ -393,7 +385,8 @@ export function Recorder({
     transition('ready');
     tapEvents.current = [];
   }
-  const busy = phase === 'requesting' || phase === 'analyzing';
+  const busy =
+    phase === 'requesting' || phase === 'countdown' || phase === 'analyzing';
   return (
     <Dialog
       open
@@ -515,66 +508,57 @@ export function Recorder({
                         : 'Tap here'}
                   </span>
                 </button>
-              ) : !micReady ? (
-                <button
-                  className="record-button"
-                  disabled={busy}
-                  onClick={enableMic}
-                >
-                  <Mic size={26} />
-                  {phase === 'requesting'
-                    ? 'Allow the microphone…'
-                    : 'Enable microphone'}
-                </button>
               ) : (
-                <button
-                  className="record-button"
-                  disabled={phase === 'analyzing'}
-                  onPointerDown={(e) => {
-                    if (e.button !== 0) return;
-                    e.preventDefault();
-                    e.currentTarget.setPointerCapture(e.pointerId);
-                    held.current = true;
-                    void startMic(true);
-                  }}
-                  onPointerUp={() => {
-                    held.current = false;
-                    stopMic();
-                  }}
-                  onPointerCancel={() => {
-                    held.current = false;
-                    stopMic();
-                  }}
-                  onKeyDown={(e) => {
-                    if ((e.key === ' ' || e.key === 'Enter') && !e.repeat) {
-                      e.preventDefault();
-                      held.current = true;
-                      void startMic(true);
-                    }
-                  }}
-                  onKeyUp={(e) => {
-                    if (e.key === ' ' || e.key === 'Enter') {
-                      e.preventDefault();
-                      held.current = false;
-                      stopMic();
-                    }
-                  }}
-                  onBlur={() => {
-                    held.current = false;
-                    stopMic();
-                  }}
-                >
-                  <Mic size={26} />
-                  {phase === 'analyzing'
-                    ? 'Finding your music…'
-                    : phase === 'requesting'
-                      ? 'Getting ready…'
+                <>
+                  <output
+                    className={`capture-cue ${phase === 'recording' ? 'live' : phase === 'countdown' ? 'counting' : ''}`}
+                    aria-label="Recording cue"
+                    aria-live="polite"
+                    aria-atomic="true"
+                  >
+                    {phase === 'countdown'
+                      ? countdown
                       : phase === 'recording'
-                        ? 'Listening… release to hear'
-                        : mode === 'hum'
-                          ? 'Hold and hum'
-                          : 'Hold and tap'}
-                </button>
+                        ? elapsed < 0.8
+                          ? mode === 'hum'
+                            ? 'Start · hum now'
+                            : 'Start · tap now'
+                          : 'Recording'
+                        : phase === 'requesting'
+                          ? 'Getting your microphone ready…'
+                          : phase === 'analyzing'
+                            ? 'Take captured'
+                            : 'Ready when you are'}
+                  </output>
+                  <button
+                    className="record-button"
+                    disabled={phase === 'analyzing'}
+                    onClick={() => {
+                      if (phaseRef.current === 'recording') stopMic();
+                      else if (
+                        phaseRef.current === 'countdown' ||
+                        phaseRef.current === 'requesting'
+                      )
+                        cancelCountIn();
+                      else void startMic();
+                    }}
+                  >
+                    {phase === 'recording' ? (
+                      <Square size={26} />
+                    ) : (
+                      <Mic size={26} />
+                    )}
+                    {phase === 'recording'
+                      ? 'Stop recording'
+                      : phase === 'countdown'
+                        ? 'Cancel countdown'
+                        : phase === 'requesting'
+                          ? 'Cancel'
+                          : phase === 'analyzing'
+                            ? 'Finding your music…'
+                            : 'Start recording'}
+                  </button>
+                </>
               )}
               <p className="record-time">
                 {phase === 'recording'
@@ -583,24 +567,16 @@ export function Recorder({
                     ? analysisProgress > 0
                       ? `Finding your notes… ${Math.round(analysisProgress * 100)}%`
                       : 'Turning your idea into a part…'
-                    : 'Up to 30 seconds. Keep it simple.'}
+                    : mode !== 'touch'
+                      ? phase === 'countdown'
+                        ? 'Get ready. Recording begins on Start.'
+                        : '3–2–1, then start. Click Stop when you’re done.'
+                      : 'Up to 30 seconds. Keep it simple.'}
               </p>
             </div>
             {mode === 'touch' && phase === 'recording' && (
               <button className="button primary full" onClick={finishTaps}>
                 <Check size={18} /> Hear my idea
-              </button>
-            )}
-            {mode !== 'touch' && micReady && !busy && (
-              <button
-                className="text-button"
-                onClick={() =>
-                  phase === 'recording' ? stopMic() : void startMic()
-                }
-              >
-                {phase === 'recording'
-                  ? 'Finish recording'
-                  : 'Or click to start, then click to finish'}
               </button>
             )}
             {backing.length > 0 && (

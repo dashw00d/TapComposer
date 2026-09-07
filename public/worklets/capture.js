@@ -3,6 +3,7 @@ class TapCapture extends AudioWorkletProcessor {
   constructor(options) {
     super();
     this.startAt = options.processorOptions.startAt;
+    this.startFrame = Math.round(this.startAt * sampleRate);
     this.limit = Math.round(sampleRate * 30);
     this.samples = new Float32Array(this.limit);
     this.length = 0;
@@ -18,24 +19,32 @@ class TapCapture extends AudioWorkletProcessor {
     const pcm = this.samples.slice(0, this.length);
     this.port.postMessage({ type: 'complete', pcm }, [pcm.buffer]);
   }
-  process(inputs) {
+  process(inputs, outputs) {
     if (this.done) return false;
     const channel = inputs[0]?.[0];
-    if (!channel) return true;
-    const skip = Math.max(
-      0,
-      Math.ceil((this.startAt - currentTime) * sampleRate),
-    );
-    if (skip >= channel.length) return true;
-    const count = Math.min(channel.length - skip, this.limit - this.length);
-    this.samples.set(channel.subarray(skip, skip + count), this.length);
-    this.length += count;
+    const frames = outputs?.[0]?.[0]?.length ?? channel?.length ?? 128;
+    const relativeFrame =
+      Math.round(currentTime * sampleRate) - this.startFrame;
+    const skip = Math.max(0, -relativeFrame);
+    if (skip >= frames) return true;
+    const offset = Math.max(0, relativeFrame);
+    if (offset >= this.limit) {
+      this.length = this.limit;
+      this.finish();
+      return false;
+    }
+    const count = Math.min(frames - skip, this.limit - offset);
+    // Missing input remains silence on the timeline; it must never pull later
+    // audio forward or delay the 30-second limit.
+    if (channel) this.samples.set(channel.subarray(skip, skip + count), offset);
+    this.length = Math.max(this.length, offset + count);
     if (++this.meterFrames % 12 === 0) {
       let energy = 0;
-      for (const v of channel) energy += v * v;
+      if (channel)
+        for (const v of channel.subarray(skip, skip + count)) energy += v * v;
       this.port.postMessage({
         type: 'meter',
-        level: Math.sqrt(energy / channel.length),
+        level: Math.sqrt(energy / count),
         elapsed: this.length / sampleRate,
       });
     }

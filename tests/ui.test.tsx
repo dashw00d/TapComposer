@@ -438,3 +438,118 @@ void test('suggestions can be discarded, retried, accepted once, and undone in t
     localStorage.clear();
   }
 });
+
+void test('microphone countdown follows the capture clock, shares backing start, and can be cancelled', async () => {
+  const oldMedia = Object.getOwnPropertyDescriptor(navigator, 'mediaDevices');
+  const oldWorklet = globalThis.AudioWorkletNode;
+  let stopped = 0;
+  Object.defineProperty(navigator, 'mediaDevices', {
+    configurable: true,
+    value: {
+      getUserMedia: async () => ({
+        getTracks: () => [
+          {
+            stop: () => {
+              stopped++;
+            },
+          },
+        ],
+      }),
+    },
+  });
+  const nodes: { startAt: number; commands: string[] }[] = [];
+  class FakeWorklet {
+    record: { startAt: number; commands: string[] };
+    port = {
+      onmessage: null,
+      postMessage: (command: string) => this.record.commands.push(command),
+      close() {},
+    };
+    constructor(
+      _context: unknown,
+      _name: string,
+      options: { processorOptions: { startAt: number } },
+    ) {
+      this.record = { startAt: options.processorOptions.startAt, commands: [] };
+      nodes.push(this.record);
+    }
+    connect() {}
+    disconnect() {}
+  }
+  globalThis.AudioWorkletNode =
+    FakeWorklet as unknown as typeof AudioWorkletNode;
+  const clock = {
+    currentTime: 10,
+    sampleRate: 48000,
+    destination: {},
+    createMediaStreamSource: () => ({ connect() {}, disconnect() {} }),
+  };
+  const engine = new AudioEngine();
+  engine.prepareCapture = async () => clock as unknown as AudioContext;
+  engine.load = async () => {};
+  engine.stop = () => {};
+  let backingStart: number | undefined;
+  engine.play = async (_tracks, _repeat, _end, startAt) => {
+    backingStart = startAt;
+    return { startAt: startAt!, duration: 4 };
+  };
+  try {
+    render(
+      <Recorder
+        instrument="piano"
+        song={sample()}
+        engine={engine}
+        onClose={() => {}}
+        onKeep={() => {}}
+      />,
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Start recording' }));
+    await waitFor(() =>
+      assert.equal(screen.getByLabelText('Recording cue').textContent, '3'),
+    );
+    assert.equal(backingStart, nodes[0].startAt);
+    assert.ok(nodes[0].startAt - clock.currentTime >= 3);
+    assert.equal(
+      screen.queryByRole('button', { name: 'Stop recording' }),
+      null,
+    );
+    clock.currentTime = nodes[0].startAt - 1.8;
+    await waitFor(() =>
+      assert.equal(screen.getByLabelText('Recording cue').textContent, '2'),
+    );
+    clock.currentTime = nodes[0].startAt - 0.8;
+    await waitFor(() =>
+      assert.equal(screen.getByLabelText('Recording cue').textContent, '1'),
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Cancel countdown' }));
+    assert.equal(stopped, 1);
+    assert.deepEqual(
+      nodes[0].commands,
+      [],
+      'Cancelling must not finish or analyze a take',
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Start recording' }));
+    await waitFor(() => assert.equal(nodes.length, 2));
+    clock.currentTime = nodes[1].startAt;
+    await waitFor(() =>
+      assert.ok(screen.getByRole('button', { name: 'Stop recording' })),
+    );
+    assert.equal(
+      screen.getByLabelText('Recording cue').textContent,
+      'Start · hum now',
+    );
+    fireEvent.blur(screen.getByRole('button', { name: 'Stop recording' }));
+    assert.deepEqual(
+      nodes[1].commands,
+      [],
+      'Focus changes no longer stop recording',
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Stop recording' }));
+    assert.deepEqual(nodes[1].commands, ['stop']);
+  } finally {
+    cleanup();
+    globalThis.AudioWorkletNode = oldWorklet;
+    if (oldMedia) Object.defineProperty(navigator, 'mediaDevices', oldMedia);
+    else Reflect.deleteProperty(navigator, 'mediaDevices');
+  }
+});

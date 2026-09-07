@@ -1742,3 +1742,24 @@ footer {
   padding: 0;
   min-width: 0;
 }
+.capture-cue {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 74px;
+  margin: 0 0 16px;
+  text-align: center;
+  color: #b5c4d2;
+  font-size: 17px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+.capture-cue.counting {
+  color: #d6f68a;
+  font-size: 62px;
+  line-height: 1;
+}
+.capture-cue.live {
+  color: #d6f68a;
+  font-size: 25px;
+}
