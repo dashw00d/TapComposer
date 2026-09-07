@@ -36,3 +36,6 @@ Tiny was selected for the monophonic humming path because it handled the upper-h
 - All model/runtime assets are served from the app's own origin. No original recordings leave the browser. Free mode makes no audio inference uploads. Premium explicitly uploads the arranged instrumental WAV to its inference service.
 
 The new real-voice benchmark exposes substantial note-boundary errors. Room-noise, actual browser microphone processing, freeform humming with manual note labels, and mobile-device evaluation are still needed. The older synthetic checks are regressions, not proof of practical transcription accuracy.
+
+
+Premium GPU recognition and real-voice comparisons are now documented in [VOICE_EVALUATION.md](./VOICE_EVALUATION.md), with installation in [inference/VOICE_SETUP.md](./inference/VOICE_SETUP.md). Free recognition retains the browser engine evaluated above.

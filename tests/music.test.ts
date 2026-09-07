@@ -109,7 +109,7 @@ void test('a steady tap pattern infers its pulse and instruments arrange distinc
   assert.ok(drums.events.some((e) => e.note === 38));
   assert.equal(drums.duration, 4);
 });
-void test('soft correction retains human timing and later tracks retain initial silence', () => {
+void test('natural hum timing and initial silence remain exact until smoothing', () => {
   const intent = buildIntent(
       'hum',
       [
@@ -125,7 +125,7 @@ void test('soft correction retains human timing and later tracks retain initial 
     ),
     context = { tempo: 120, key: 0, mode: 'major' as const, confidence: 0.7 };
   const resolved = resolveIntent(intent, 'piano', context, false, true);
-  assert.ok(resolved.events[0].time > 1.75 && resolved.events[0].time < 1.793);
+  assert.equal(resolved.events[0].time, 1.793);
   const first = resolveIntent(intent, 'piano', context, false, false);
   assert.equal(first.events[0].time, 0);
 });

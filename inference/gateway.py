@@ -19,9 +19,12 @@ ROOT = Path(os.environ.get('TAPCOMPOSER_RENDER_DIR', './outputs/premium')).resol
 ROOT.mkdir(parents=True, exist_ok=True)
 TOKEN = os.environ.get('TAPCOMPOSER_INFERENCE_KEY', '')
 UPSTREAM = os.environ.get('ACESTEP_ORIGIN', 'http://127.0.0.1:8001').rstrip('/')
+VOICE = os.environ.get('TAPCOMPOSER_VOICE_ORIGIN', 'http://127.0.0.1:8790').rstrip('/')
 MODEL = os.environ.get('ACESTEP_CONFIG_PATH', 'acestep-v15-xl-turbo')
 queue = asyncio.Queue(maxsize=3)
 active = set()
+voice_idle = asyncio.Event()
+voice_idle.set()
 
 def save(job):
     folder = ROOT / job['id']; folder.mkdir(exist_ok=True)
@@ -98,6 +101,7 @@ async def run_queue():
         job_id = await queue.get()
         try:
             job = read(job_id)
+            await voice_idle.wait()
             await process(job)
         except Exception as exc:
             print('Premium render failed:', job_id, type(exc).__name__, str(exc), flush=True)
@@ -131,7 +135,13 @@ async def health(request: Request):
             info = response.json()
             ready = response.is_success and info.get('data', {}).get('models_initialized') is True
     except Exception: pass
-    return {'ready': ready, 'queued': len(active)}
+    voice_ready = False
+    try:
+        async with httpx.AsyncClient(timeout=1) as client:
+            response = await client.get(VOICE + '/health', headers={'Authorization': 'Bearer ' + TOKEN})
+            voice_ready = response.is_success and response.json().get('ready') is True
+    except Exception: pass
+    return {'ready': ready, 'queued': len(active), 'transcriptionReady': voice_ready}
 
 @app.post('/jobs')
 async def submit(request: Request):
@@ -171,3 +181,32 @@ async def audio(job_id: str, request: Request):
     await authorized(request)
     if read(job_id)['state'] != 'ready': raise HTTPException(409, 'The performance is not ready yet.')
     return FileResponse(ROOT / job_id / 'performance.wav', media_type='audio/wav', filename='studio-performance.wav')
+
+
+@app.post('/transcribe')
+async def transcribe(request: Request):
+    await authorized(request)
+    if request.headers.get('content-type', '').split(';')[0] != 'audio/wav':
+        raise HTTPException(400, 'Send a WAV recording.')
+    # Do not overlap temporary voice activations and ACE generation on the GPU.
+    if active or not voice_idle.is_set():
+        raise HTTPException(503, 'The GPU is busy.')
+    voice_idle.clear()
+    try:
+        chunks = []; size = 0
+        async with asyncio.timeout(15):
+            async for chunk in request.stream():
+                size += len(chunk)
+                if size > 12 * 1024 * 1024: raise HTTPException(413, 'Recording too large.')
+                chunks.append(chunk)
+        async with httpx.AsyncClient(timeout=20) as client:
+            response = await client.post(VOICE + '/transcribe', content=b''.join(chunks),
+                headers={'Authorization': 'Bearer ' + TOKEN, 'Content-Type': 'audio/wav'})
+        if not response.is_success: raise HTTPException(response.status_code, 'Voice recognition is unavailable.')
+        return response.json()
+    except TimeoutError:
+        raise HTTPException(408, 'Recording upload timed out.')
+    except httpx.HTTPError:
+        raise HTTPException(503, 'Voice recognition is unavailable.')
+    finally:
+        voice_idle.set()

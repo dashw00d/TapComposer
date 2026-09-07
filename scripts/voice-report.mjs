@@ -1,7 +1,8 @@
 // Local listening report. Dataset audio stays under ignored outputs, never public/.
 import { readFile, writeFile, readdir } from 'node:fs/promises';
 const root = 'outputs/voice-benchmark';
-const labels = process.argv.slice(2);
+const premiumHums = process.argv.includes('--premium-hums');
+const labels = process.argv.slice(2).filter((a) => a !== '--premium-hums');
 if (!labels.length) labels.push('baseline-tiny', 'baseline-heldout');
 if (labels.some((l) => !/^[\w-]+$/.test(l)))
   throw new Error('Invalid report label');
@@ -17,7 +18,10 @@ for (const label of labels) {
 let rsh = [];
 try {
   rsh = JSON.parse(
-    await readFile(`${root}/rsh/listening.json`, 'utf8'),
+    await readFile(
+      `${root}/rsh/${premiumHums ? 'listening-premium' : 'listening'}.json`,
+      'utf8',
+    ),
   ).samples;
 } catch {
   /* Optional humming bank. */
@@ -51,7 +55,7 @@ const ns='http://www.w3.org/2000/svg';function element(tag,attrs,text){const e=d
 function draw(){const svg=$('graph');svg.replaceChildren();const all=[...current.notes,...current.annotations.flat()];const lo=Math.floor(Math.min(...all.map(n=>n.pitch)))-2,hi=Math.ceil(Math.max(...all.map(n=>n.pitch)))+2,d=current.result.duration;const x=t=>60+Math.min(d,t)/d*1020,y=p=>330-(p-lo)/(hi-lo)*290;for(let t=0;t<=d;t+=2){svg.append(element('line',{x1:x(t),x2:x(t),y1:20,y2:340,stroke:'#2b3549'}),element('text',{x:x(t),y:365,fill:'#8e9ab4','font-size':13},t+'s'));}for(let p=lo;p<=hi;p+=2)svg.append(element('text',{x:8,y:y(p)+4,fill:'#8e9ab4','font-size':12},['C','C♯','D','D♯','E','F','F♯','G','G♯','A','A♯','B'][((p%12)+12)%12]+(Math.floor(p/12)-1)));[current.notes,...current.annotations].forEach((notes,k)=>notes.forEach(n=>svg.append(element('rect',{x:x(n.time),y:y(n.pitch)+(k-1)*5,width:Math.max(2,x(n.time+n.duration)-x(n.time)),height:4,rx:2,fill:['#aa9aff','#66d6af','#edb77c'][k]}))));}
 async function play(notes,label,duration=current.result.duration){stop();context??=new AudioContext();await context.resume();const now=context.currentTime+.05;for(const note of notes){const o=context.createOscillator(),g=context.createGain();o.type='triangle';o.frequency.value=440*2**((note.pitch-69)/12);const start=now+note.time,end=start+Math.max(.03,note.duration);g.gain.setValueAtTime(0,start);g.gain.linearRampToValueAtTime(.12,start+.008);g.gain.setValueAtTime(.12,Math.max(start+.008,end-.025));g.gain.linearRampToValueAtTime(0,end);o.connect(g).connect(context.destination);o.start(start);o.stop(end+.01);o.onended=()=>{o.disconnect();g.disconnect()};nodes.push(o);}$('status').textContent=label+' — includes the original leading silence';timer=setTimeout(()=>{$('status').textContent='';nodes=[]},(duration+.1)*1000);}
 $('sort').onchange=list;$('split').onchange=list;$('samples').onchange=choose;$('stop').onclick=stop;$('detected').onclick=()=>play(current.notes,'Detected notes');$('human1').onclick=()=>play(current.annotations[0],'Human notes 1');$('human2').onclick=()=>play(current.annotations[1],'Human notes 2');$('voice').onplay=()=>{for(const n of nodes){try{n.stop()}catch{}}nodes=[];clearTimeout(timer);$('status').textContent='Original voice';};$('voice').ontimeupdate=()=>{if(current&&$('voice').currentTime>=current.result.duration)$('voice').pause();};
-for(const sample of rsh){const card=document.createElement('div');card.className='card';const name=document.createElement('div');name.className='meta';name.textContent=sample.id;const audio=document.createElement('audio');audio.controls=true;audio.preload='none';audio.src=sample.audio;audio.onplay=()=>{for(const n of nodes){try{n.stop()}catch{}}nodes=[];document.querySelectorAll('audio').forEach(a=>{if(a!==audio)a.pause()})};card.append(name,audio);if(sample.notes){const button=document.createElement('button');button.textContent='Play '+sample.notes.length+' detected notes';button.onclick=()=>play(sample.notes,sample.id+' detected notes',sample.duration);card.append(button);}$('rsh').append(card);}list();
+for(const sample of rsh){const card=document.createElement('div');card.className='card';const name=document.createElement('div');name.className='meta';name.textContent=sample.id+(sample.analyzer?' · '+sample.analyzer:' · browser');const audio=document.createElement('audio');audio.controls=true;audio.preload='none';audio.src=sample.audio;audio.onplay=()=>{for(const n of nodes){try{n.stop()}catch{}}nodes=[];document.querySelectorAll('audio').forEach(a=>{if(a!==audio)a.pause()})};card.append(name,audio);if(sample.notes){const button=document.createElement('button');button.textContent='Play '+sample.notes.length+' detected notes';button.onclick=()=>play(sample.notes,sample.id+' detected notes',sample.duration);card.append(button);}$('rsh').append(card);}list();
 </script></body></html>`;
 await writeFile(`${root}/report.html`, html);
 console.log(

@@ -14,7 +14,7 @@ export interface IntentEvent {
   intensity: number;
 }
 export interface MusicalIntent {
-  analyzer?: 'crepe-tiny' | 'yin';
+  analyzer?: 'crepe-tiny' | 'yin' | 'rosvot-crepe';
   version: 1;
   source: InputSource;
   events: IntentEvent[];

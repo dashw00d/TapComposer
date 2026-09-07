@@ -1289,13 +1289,14 @@ export default function Composer() {
           </DialogDescription>
           <div className="credits-text">
             <p>
-              Recording, melody detection, playback, and export happen in your
-              browser. Your songs and original recordings are stored here, on
-              your device. Premium rendering sends the arranged audio and style
-              direction to the GPU service on this computer when you choose
-              “Make a studio take.” Original microphone recordings stay here.
-              Clearing your browser’s data removes them. Download anything you
-              want to keep.
+              Recording, playback, and export happen in your browser. Free
+              melody detection runs in the browser too. Premium humming
+              recognition uses the GPU service on this computer and discards its
+              temporary audio after analysis. Your songs and original recordings
+              are stored here, on your device. Premium rendering sends the
+              arranged audio and style direction to the GPU service on this
+              computer when you choose “Make a studio take.” Clearing your
+              browser’s data removes them. Download anything you want to keep.
             </p>
             <p>
               Humming recognition uses{' '}
@@ -1308,7 +1309,16 @@ export default function Composer() {
               </a>{' '}
               by Jong Wook Kim and collaborators, via torchcrepe and onnxcrepe
               (MIT). It runs here on your device, with a quick detector as
-              backup.
+              backup. Premium recognition combines the full CREPE model with{' '}
+              <a
+                href="https://github.com/RickyL-2000/ROSVOT"
+                target="_blank"
+                rel="noreferrer"
+              >
+                ROSVOT, RWBD and RMVPE
+              </a>{' '}
+              for note boundaries and pitch, with local browser recognition as
+              fallback.
             </p>
             <p>
               Piano: Salamander Grand Piano by Alexander Holm, shared under{' '}

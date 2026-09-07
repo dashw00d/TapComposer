@@ -1,0 +1,16 @@
+[Unit]
+Description=TapComposer local GPU voice recognition
+After=network.target
+
+[Service]
+Type=simple
+WorkingDirectory=/home/ryan/dev/TapComposer/app/inference
+EnvironmentFile=/home/ryan/dev/TapComposer/inference/runtime/gateway.env
+Environment=PYTHONUNBUFFERED=1
+Environment=OMP_NUM_THREADS=4
+ExecStart=/home/ryan/dev/TapComposer/inference/voice-venv/bin/uvicorn voice_server:app --host 127.0.0.1 --port 8790
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=default.target

@@ -13,7 +13,7 @@ void test('premium entitlement and route allowlist fail closed', async () => {
   const upstream = (async () => {
     throw new Error('Must not contact inference');
   }) as typeof fetch;
-  for (const path of ['render', 'jobs/abc'])
+  for (const path of ['render', 'transcribe', 'jobs/abc'])
     assert.equal(
       (
         await premiumRequest(
@@ -101,6 +101,7 @@ void test('health never exposes upstream internals and reports actual readiness'
     premium: true,
     ready: true,
     queued: 1,
+    transcriptionReady: false,
   });
 });
 void test('premium uses the arranged song and backups retain takes', async () => {
@@ -131,4 +132,59 @@ void test('premium uses the arranged song and backups retain takes', async () =>
     await audio.text(),
   );
   assert.equal(restored.premiumTakes?.[0].fingerprint, fingerprint);
+});
+
+void test('voice proxy gates origins and size and forwards only WAV to transcription', async () => {
+  const request = (headers: Record<string, string> = {}) =>
+    new Request('https://studio.example/api/premium/transcribe', {
+      method: 'POST',
+      body: new Blob(['RIFFvoice'], { type: 'audio/wav' }),
+      headers: { 'Content-Type': 'audio/wav', ...headers },
+    });
+  const forbidden = (async () => {
+    throw new Error('Invalid audio must not be forwarded');
+  }) as typeof fetch;
+  assert.equal(
+    (
+      await premiumRequest(
+        request({ Origin: 'https://elsewhere.example' }),
+        config,
+        forbidden,
+      )
+    ).status,
+    403,
+  );
+  assert.equal(
+    (
+      await premiumRequest(
+        request({ 'Content-Length': String(13 * 1024 * 1024) }),
+        config,
+        forbidden,
+      )
+    ).status,
+    413,
+  );
+  assert.equal(
+    (
+      await premiumRequest(
+        request({ 'Content-Type': 'application/json' }),
+        config,
+        forbidden,
+      )
+    ).status,
+    400,
+  );
+  const response = await premiumRequest(request(), config, (async (
+    url,
+    init,
+  ) => {
+    assert.equal((url as URL).pathname, '/transcribe');
+    assert.equal(
+      new Headers(init?.headers).get('Authorization'),
+      'Bearer server-only-secret',
+    );
+    assert.equal(await new Request(url, init).text(), 'RIFFvoice');
+    return Response.json({ analyzer: 'rosvot-crepe' });
+  }) as typeof fetch);
+  assert.deepEqual(await response.json(), { analyzer: 'rosvot-crepe' });
 });

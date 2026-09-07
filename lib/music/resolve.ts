@@ -72,7 +72,13 @@ export function resolveIntent(
   const offset = preserveOffset ? 0 : intent.events[0].time;
   const beat = 60 / context.tempo,
     grid = beat / 2;
-  const strength = preserveTiming ? 0 : smoother ? 0.8 : 0.28;
+  const strength = preserveTiming
+    ? 0
+    : smoother
+      ? 0.8
+      : intent.source === 'hum'
+        ? 0
+        : 0.28;
   const events: PerformanceEvent[] = intent.events.flatMap((e, i) => {
     const raw = Math.max(0, e.time - offset);
     const time = Math.max(

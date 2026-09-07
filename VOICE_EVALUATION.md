@@ -1,6 +1,33 @@
 # Real voice evaluation
 
-The current recognition is not accurate enough for unrestricted casual humming. The earlier synthetic tones were useful regression tests, but did not establish human-voice quality. This pass adds actual samples, reproducible measurements and an original-versus-detected listening report. It does **not** change the app's recognition behavior or train new weights.
+Premium recognition now uses a GPU model ensemble and a new note decoder; Free keeps the browser model. This improves measured pitch and note timing on the real vocal bank, but does not establish reliable recognition for every casual hum. No model training or fine-tuning was performed.
+
+## Premium GPU results — September 7, 2026
+
+| Engine / group | Clips | Pitch recall | Note F1, 100 ms | Note F1, 50 ms |
+| --- | ---: | ---: | ---: | ---: |
+| Browser / all | 40 | 94.69% | 68.27% | 59.71% |
+| Premium GPU / all | 40 | 97.15% | 73.28% | 66.31% |
+| Premium GPU / tuning | 22 | 96.95% | 74.02% | 66.99% |
+| Premium GPU / reserved | 18 | 97.39% | 72.36% | 65.48% |
+
+The exact engine was rerun on all 40 clips after the final decoder change. Results and source/model fingerprints are in [benchmarks/voice-premium.json](./benchmarks/voice-premium.json). Mean inference time was **0.51 seconds per clip**, including the first cold call, with **886 MiB peak PyTorch allocation** on the RTX 4070 Ti Super. This is not total process/desktop VRAM. The live HTTP/client smoke test took **0.70 seconds** for the 30-second prefix of the wordless recording and returned identical notes on replay.
+
+ROSVOT/RWBD learned boundaries are aligned to full-CREPE acoustic pitch; RMVPE supplies conditioning for the boundary model. Unsupported splits are merged when pitch and volume continue smoothly. Raw ROSVOT output was worse than the browser baseline, so its note classes/timing are not used directly. Random pitch-bin dithering in torchcrepe was removed, and its weighted decoder was replaced with deterministic weighting of the actual probabilities. The app now preserves natural humming timing unless the user chooses smoothing.
+
+Both singer groups improved in aggregate, but some individual recordings still regress. The reserved recordings were inspected during development and are **regression evidence, not an unseen validation claim**. Most labeled clips are singing, and repeated syllables, room noise, microphone latency and backing bleed still need broader human-recorded validation. Synthetic checks cover held vibrato, repeated same-pitch syllables, changing notes, silence and quiet noise; they are separate from human-voice accuracy evidence.
+
+The 138 public RSH examples can also be replayed through the running premium HTTP service for listening comparisons. They remain **unlabeled**: their predictions are neither ground truth nor training data. [Service installation and behavior](./inference/VOICE_SETUP.md).
+
+```bash
+../inference/voice-venv/bin/python scripts/benchmark-gpu-voices.py my-gpu-run all
+npx tsx scripts/score-gpu-voices.ts my-gpu-run
+python3 scripts/benchmark-gpu-hums.py
+npm run voices:report -- baseline-tiny baseline-heldout my-gpu-run --premium-hums
+npm run voices:serve
+```
+
+Output labels must be fresh. The RSH replay preserves an existing `listening-premium.json`; move it aside before another run. All corpus audio remains in ignored outputs and is not bundled with the app.
 
 ## Data on this machine
 
@@ -13,9 +40,9 @@ Audio, archives, detailed prediction traces and generated HTML stay in ignored `
 
 HumTrans was considered, but its original onset/offset labels have documented problems and its dataset card specifies CC BY-NC. It was not downloaded, trained on, or used in the measurements. [Dataset](https://huggingface.co/datasets/dadinghh2/HumTrans), [annotation investigation](https://github.com/shubham-gupta-30/humming_transcription). More files alone do not solve bad or missing reference labels.
 
-## Measurements
+## Browser baseline measurements
 
-Current app decoder, source revision `e44049c`; pinned model hashes and per-recording results are saved in [benchmarks/voice-baseline.json](./benchmarks/voice-baseline.json). Neural frame extraction was factored out of `neuralHum` without changing its computation, so the benchmark calls the same inference and segmentation functions used in capture.
+Browser decoder, source revision `e44049c`; pinned model hashes and per-recording results are saved in [benchmarks/voice-baseline.json](./benchmarks/voice-baseline.json). Neural frame extraction was factored out of `neuralHum` without changing its computation, so the benchmark calls the same inference and segmentation functions used in capture.
 
 | Model / group | Recordings | Pitch recall | Note F1, 100 ms | Note F1, 50 ms | Inference seconds per audio second |
 | --- | ---: | ---: | ---: | ---: | ---: |

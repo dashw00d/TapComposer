@@ -1,0 +1,2230 @@
+{
+  "date": "2026-09-07",
+  "provenance": {
+    "sourceSha256": {
+      "voice_engine.py": "69a131967897efe9de0adaa0c45311e59689f712c56c5ce326ab2954af647c64",
+      "voice_decode.py": "265bc8312be72a5b3371d5816874b2e916d015636623bd663b5954e930debb41"
+    },
+    "split": "all",
+    "model": "ROSVOT / RWBD / RMVPE + CREPE full (torchcrepe 0.0.24)",
+    "rosvotCommit": "3c8332bf43adae35f6e4d64971862f2f6139b310",
+    "weightsRevision": "83dc50289d22a81b1e9998f5b9e111aef7c1fdcd",
+    "device": "NVIDIA GeForce RTX 4070 Ti SUPER"
+  },
+  "crepeFullSha256": "133225604dedd2e4005f8bbd1bd0a2ec073ba8b7a6cd31ff6d5edbbfa3539986",
+  "summary": {
+    "all": {
+      "browser": {
+        "recordings": 40,
+        "pitchRecall": 0.9468794092713438,
+        "noteF1_100": 0.6826871235110484,
+        "noteF1_50": 0.5971339935696012
+      },
+      "premium": {
+        "recordings": 40,
+        "pitchRecall": 0.9714895520777119,
+        "noteF1_100": 0.7327531094370082,
+        "noteF1_50": 0.6631388381968387
+      }
+    },
+    "dev": {
+      "browser": {
+        "recordings": 22,
+        "pitchRecall": 0.9416819490268136,
+        "noteF1_100": 0.6773514523002232,
+        "noteF1_50": 0.5951108545336781
+      },
+      "premium": {
+        "recordings": 22,
+        "pitchRecall": 0.9695284282490082,
+        "noteF1_100": 0.7402188172972348,
+        "noteF1_50": 0.6699301492732518
+      }
+    },
+    "heldout": {
+      "browser": {
+        "recordings": 18,
+        "pitchRecall": 0.9532318606813253,
+        "noteF1_100": 0.6892084994353904,
+        "noteF1_50": 0.5996067190579517
+      },
+      "premium": {
+        "recordings": 18,
+        "pitchRecall": 0.9738864812016831,
+        "noteF1_100": 0.7236283553856201,
+        "noteF1_50": 0.6548383468812228
+      }
+    }
+  },
+  "performance": {
+    "label": "gpu-deterministic",
+    "recordings": 40,
+    "noteF1_100": 0.7327531094370083,
+    "noteF1_50": 0.6631388381968388,
+    "meanSeconds": 0.5130729104999773,
+    "peakMiB": 885.65478515625
+  },
+  "results": [
+    {
+      "id": "vocadito_1",
+      "singer": "S1",
+      "split": "dev",
+      "duration": 30,
+      "milliseconds": 1647.091813998486,
+      "frame": {
+        "voiced": 3393,
+        "correct": 3306,
+        "detected": 3331,
+        "falseVoiced": 116,
+        "silent": 1775,
+        "pitchRecall": 0.9743589743589743,
+        "voiceRecall": 0.981727085175361,
+        "falseVoiceRate": 0.06535211267605634
+      },
+      "notes100": [
+        {
+          "hits": 48,
+          "reference": 57,
+          "predicted": 57,
+          "precision": 0.8421052631578947,
+          "recall": 0.8421052631578947,
+          "f1": 0.8421052631578947
+        },
+        {
+          "hits": 49,
+          "reference": 62,
+          "predicted": 57,
+          "precision": 0.8596491228070176,
+          "recall": 0.7903225806451613,
+          "f1": 0.8235294117647058
+        }
+      ],
+      "notes50": [
+        {
+          "hits": 44,
+          "reference": 57,
+          "predicted": 57,
+          "precision": 0.7719298245614035,
+          "recall": 0.7719298245614035,
+          "f1": 0.7719298245614035
+        },
+        {
+          "hits": 46,
+          "reference": 62,
+          "predicted": 57,
+          "precision": 0.8070175438596491,
+          "recall": 0.7419354838709677,
+          "f1": 0.773109243697479
+        }
+      ],
+      "gpuPeakMiB": 884.77734375
+    },
+    {
+      "id": "vocadito_10",
+      "singer": "S7",
+      "split": "dev",
+      "duration": 9.097823129251701,
+      "milliseconds": 268.0624179993174,
+      "frame": {
+        "voiced": 1180,
+        "correct": 1141,
+        "detected": 1161,
+        "falseVoiced": 144,
+        "silent": 388,
+        "pitchRecall": 0.9669491525423729,
+        "voiceRecall": 0.9838983050847457,
+        "falseVoiceRate": 0.3711340206185567
+      },
+      "notes100": [
+        {
+          "hits": 20,
+          "reference": 35,
+          "predicted": 26,
+          "precision": 0.7692307692307693,
+          "recall": 0.5714285714285714,
+          "f1": 0.6557377049180327
+        },
+        {
+          "hits": 19,
+          "reference": 27,
+          "predicted": 26,
+          "precision": 0.7307692307692307,
+          "recall": 0.7037037037037037,
+          "f1": 0.7169811320754716
+        }
+      ],
+      "notes50": [
+        {
+          "hits": 16,
+          "reference": 35,
+          "predicted": 26,
+          "precision": 0.6153846153846154,
+          "recall": 0.45714285714285713,
+          "f1": 0.5245901639344263
+        },
+        {
+          "hits": 14,
+          "reference": 27,
+          "predicted": 26,
+          "precision": 0.5384615384615384,
+          "recall": 0.5185185185185185,
+          "f1": 0.5283018867924528
+        }
+      ],
+      "gpuPeakMiB": 865.7705078125
+    },
+    {
+      "id": "vocadito_11",
+      "singer": "S8",
+      "split": "dev",
+      "duration": 12.983990929705216,
+      "milliseconds": 345.636044999992,
+      "frame": {
+        "voiced": 1707,
+        "correct": 1673,
+        "detected": 1685,
+        "falseVoiced": 133,
+        "silent": 530,
+        "pitchRecall": 0.9800820152314001,
+        "voiceRecall": 0.987111892208553,
+        "falseVoiceRate": 0.2509433962264151
+      },
+      "notes100": [
+        {
+          "hits": 25,
+          "reference": 37,
+          "predicted": 29,
+          "precision": 0.8620689655172413,
+          "recall": 0.6756756756756757,
+          "f1": 0.7575757575757576
+        },
+        {
+          "hits": 21,
+          "reference": 30,
+          "predicted": 29,
+          "precision": 0.7241379310344828,
+          "recall": 0.7,
+          "f1": 0.711864406779661
+        }
+      ],
+      "notes50": [
+        {
+          "hits": 21,
+          "reference": 37,
+          "predicted": 29,
+          "precision": 0.7241379310344828,
+          "recall": 0.5675675675675675,
+          "f1": 0.6363636363636364
+        },
+        {
+          "hits": 17,
+          "reference": 30,
+          "predicted": 29,
+          "precision": 0.5862068965517241,
+          "recall": 0.5666666666666667,
+          "f1": 0.576271186440678
+        }
+      ],
+      "gpuPeakMiB": 868.99072265625
+    },
+    {
+      "id": "vocadito_12",
+      "singer": "S9",
+      "split": "heldout",
+      "duration": 15.153492063492063,
+      "milliseconds": 400.98558500176296,
+      "frame": {
+        "voiced": 1941,
+        "correct": 1933,
+        "detected": 1936,
+        "falseVoiced": 195,
+        "silent": 670,
+        "pitchRecall": 0.9958784131890778,
+        "voiceRecall": 0.9974240082431737,
+        "falseVoiceRate": 0.291044776119403
+      },
+      "notes100": [
+        {
+          "hits": 24,
+          "reference": 27,
+          "predicted": 27,
+          "precision": 0.8888888888888888,
+          "recall": 0.8888888888888888,
+          "f1": 0.8888888888888888
+        },
+        {
+          "hits": 18,
+          "reference": 24,
+          "predicted": 27,
+          "precision": 0.6666666666666666,
+          "recall": 0.75,
+          "f1": 0.7058823529411765
+        }
+      ],
+      "notes50": [
+        {
+          "hits": 21,
+          "reference": 27,
+          "predicted": 27,
+          "precision": 0.7777777777777778,
+          "recall": 0.7777777777777778,
+          "f1": 0.7777777777777778
+        },
+        {
+          "hits": 16,
+          "reference": 24,
+          "predicted": 27,
+          "precision": 0.5925925925925926,
+          "recall": 0.6666666666666666,
+          "f1": 0.6274509803921569
+        }
+      ],
+      "gpuPeakMiB": 869.37841796875
+    },
+    {
+      "id": "vocadito_13",
+      "singer": "S10",
+      "split": "heldout",
+      "duration": 22.36,
+      "milliseconds": 552.6624470003298,
+      "frame": {
+        "voiced": 2527,
+        "correct": 2480,
+        "detected": 2499,
+        "falseVoiced": 203,
+        "silent": 1325,
+        "pitchRecall": 0.9814008705975465,
+        "voiceRecall": 0.9889196675900277,
+        "falseVoiceRate": 0.15320754716981133
+      },
+      "notes100": [
+        {
+          "hits": 39,
+          "reference": 74,
+          "predicted": 48,
+          "precision": 0.8125,
+          "recall": 0.527027027027027,
+          "f1": 0.639344262295082
+        },
+        {
+          "hits": 31,
+          "reference": 52,
+          "predicted": 48,
+          "precision": 0.6458333333333334,
+          "recall": 0.5961538461538461,
+          "f1": 0.62
+        }
+      ],
+      "notes50": [
+        {
+          "hits": 33,
+          "reference": 74,
+          "predicted": 48,
+          "precision": 0.6875,
+          "recall": 0.44594594594594594,
+          "f1": 0.5409836065573771
+        },
+        {
+          "hits": 26,
+          "reference": 52,
+          "predicted": 48,
+          "precision": 0.5416666666666666,
+          "recall": 0.5,
+          "f1": 0.52
+        }
+      ],
+      "gpuPeakMiB": 877.5390625
+    },
+    {
+      "id": "vocadito_14",
+      "singer": "S11",
+      "split": "dev",
+      "duration": 12.1978231292517,
+      "milliseconds": 332.51889500024845,
+      "frame": {
+        "voiced": 1428,
+        "correct": 1380,
+        "detected": 1388,
+        "falseVoiced": 209,
+        "silent": 674,
+        "pitchRecall": 0.9663865546218487,
+        "voiceRecall": 0.9719887955182073,
+        "falseVoiceRate": 0.31008902077151335
+      },
+      "notes100": [
+        {
+          "hits": 20,
+          "reference": 34,
+          "predicted": 28,
+          "precision": 0.7142857142857143,
+          "recall": 0.5882352941176471,
+          "f1": 0.6451612903225806
+        },
+        {
+          "hits": 17,
+          "reference": 26,
+          "predicted": 28,
+          "precision": 0.6071428571428571,
+          "recall": 0.6538461538461539,
+          "f1": 0.6296296296296297
+        }
+      ],
+      "notes50": [
+        {
+          "hits": 18,
+          "reference": 34,
+          "predicted": 28,
+          "precision": 0.6428571428571429,
+          "recall": 0.5294117647058824,
+          "f1": 0.5806451612903226
+        },
+        {
+          "hits": 15,
+          "reference": 26,
+          "predicted": 28,
+          "precision": 0.5357142857142857,
+          "recall": 0.5769230769230769,
+          "f1": 0.5555555555555556
+        }
+      ],
+      "gpuPeakMiB": 868.84521484375
+    },
+    {
+      "id": "vocadito_15",
+      "singer": "S12",
+      "split": "dev",
+      "duration": 20.28,
+      "milliseconds": 507.8491749991372,
+      "frame": {
+        "voiced": 2314,
+        "correct": 2226,
+        "detected": 2268,
+        "falseVoiced": 294,
+        "silent": 1180,
+        "pitchRecall": 0.9619706136560069,
+        "voiceRecall": 0.9801210025929127,
+        "falseVoiceRate": 0.24915254237288137
+      },
+      "notes100": [
+        {
+          "hits": 34,
+          "reference": 47,
+          "predicted": 43,
+          "precision": 0.7906976744186046,
+          "recall": 0.723404255319149,
+          "f1": 0.7555555555555555
+        },
+        {
+          "hits": 28,
+          "reference": 41,
+          "predicted": 43,
+          "precision": 0.6511627906976745,
+          "recall": 0.6829268292682927,
+          "f1": 0.6666666666666666
+        }
+      ],
+      "notes50": [
+        {
+          "hits": 28,
+          "reference": 47,
+          "predicted": 43,
+          "precision": 0.6511627906976745,
+          "recall": 0.5957446808510638,
+          "f1": 0.6222222222222222
+        },
+        {
+          "hits": 23,
+          "reference": 41,
+          "predicted": 43,
+          "precision": 0.5348837209302325,
+          "recall": 0.5609756097560976,
+          "f1": 0.5476190476190477
+        }
+      ],
+      "gpuPeakMiB": 873.85302734375
+    },
+    {
+      "id": "vocadito_16",
+      "singer": "S6",
+      "split": "dev",
+      "duration": 17.277142857142856,
+      "milliseconds": 434.1137419996812,
+      "frame": {
+        "voiced": 1877,
+        "correct": 1831,
+        "detected": 1844,
+        "falseVoiced": 157,
+        "silent": 1100,
+        "pitchRecall": 0.9754928076718167,
+        "voiceRecall": 0.9824187533297816,
+        "falseVoiceRate": 0.14272727272727273
+      },
+      "notes100": [
+        {
+          "hits": 39,
+          "reference": 47,
+          "predicted": 44,
+          "precision": 0.8863636363636364,
+          "recall": 0.8297872340425532,
+          "f1": 0.8571428571428571
+        },
+        {
+          "hits": 27,
+          "reference": 36,
+          "predicted": 44,
+          "precision": 0.6136363636363636,
+          "recall": 0.75,
+          "f1": 0.675
+        }
+      ],
+      "notes50": [
+        {
+          "hits": 38,
+          "reference": 47,
+          "predicted": 44,
+          "precision": 0.8636363636363636,
+          "recall": 0.8085106382978723,
+          "f1": 0.8351648351648352
+        },
+        {
+          "hits": 26,
+          "reference": 36,
+          "predicted": 44,
+          "precision": 0.5909090909090909,
+          "recall": 0.7222222222222222,
+          "f1": 0.65
+        }
+      ],
+      "gpuPeakMiB": 870.85791015625
+    },
+    {
+      "id": "vocadito_17",
+      "singer": "S12",
+      "split": "dev",
+      "duration": 23.56800453514739,
+      "milliseconds": 579.691434999404,
+      "frame": {
+        "voiced": 3303,
+        "correct": 3254,
+        "detected": 3267,
+        "falseVoiced": 41,
+        "silent": 757,
+        "pitchRecall": 0.9851650015137754,
+        "voiceRecall": 0.989100817438692,
+        "falseVoiceRate": 0.05416116248348745
+      },
+      "notes100": [
+        {
+          "hits": 38,
+          "reference": 54,
+          "predicted": 47,
+          "precision": 0.8085106382978723,
+          "recall": 0.7037037037037037,
+          "f1": 0.7524752475247525
+        },
+        {
+          "hits": 31,
+          "reference": 47,
+          "predicted": 47,
+          "precision": 0.6595744680851063,
+          "recall": 0.6595744680851063,
+          "f1": 0.6595744680851063
+        }
+      ],
+      "notes50": [
+        {
+          "hits": 33,
+          "reference": 54,
+          "predicted": 47,
+          "precision": 0.7021276595744681,
+          "recall": 0.6111111111111112,
+          "f1": 0.6534653465346535
+        },
+        {
+          "hits": 27,
+          "reference": 47,
+          "predicted": 47,
+          "precision": 0.574468085106383,
+          "recall": 0.574468085106383,
+          "f1": 0.574468085106383
+        }
+      ],
+      "gpuPeakMiB": 878.6005859375
+    },
+    {
+      "id": "vocadito_18",
+      "singer": "S13",
+      "split": "heldout",
+      "duration": 29.138820861678006,
+      "milliseconds": 702.238411999133,
+      "frame": {
+        "voiced": 2241,
+        "correct": 2172,
+        "detected": 2192,
+        "falseVoiced": 171,
+        "silent": 2779,
+        "pitchRecall": 0.9692101740294511,
+        "voiceRecall": 0.9781347612672914,
+        "falseVoiceRate": 0.06153292551277438
+      },
+      "notes100": [
+        {
+          "hits": 29,
+          "reference": 45,
+          "predicted": 36,
+          "precision": 0.8055555555555556,
+          "recall": 0.6444444444444445,
+          "f1": 0.7160493827160493
+        },
+        {
+          "hits": 25,
+          "reference": 34,
+          "predicted": 36,
+          "precision": 0.6944444444444444,
+          "recall": 0.7352941176470589,
+          "f1": 0.7142857142857143
+        }
+      ],
+      "notes50": [
+        {
+          "hits": 28,
+          "reference": 45,
+          "predicted": 36,
+          "precision": 0.7777777777777778,
+          "recall": 0.6222222222222222,
+          "f1": 0.691358024691358
+        },
+        {
+          "hits": 23,
+          "reference": 34,
+          "predicted": 36,
+          "precision": 0.6388888888888888,
+          "recall": 0.6764705882352942,
+          "f1": 0.6571428571428571
+        }
+      ],
+      "gpuPeakMiB": 883.91552734375
+    },
+    {
+      "id": "vocadito_19",
+      "singer": "S14",
+      "split": "dev",
+      "duration": 30,
+      "milliseconds": 684.7126759985258,
+      "frame": {
+        "voiced": 3352,
+        "correct": 3290,
+        "detected": 3305,
+        "falseVoiced": 352,
+        "silent": 1816,
+        "pitchRecall": 0.9815035799522673,
+        "voiceRecall": 0.9859785202863962,
+        "falseVoiceRate": 0.19383259911894274
+      },
+      "notes100": [
+        {
+          "hits": 52,
+          "reference": 73,
+          "predicted": 64,
+          "precision": 0.8125,
+          "recall": 0.7123287671232876,
+          "f1": 0.7591240875912408
+        },
+        {
+          "hits": 53,
+          "reference": 61,
+          "predicted": 64,
+          "precision": 0.828125,
+          "recall": 0.8688524590163934,
+          "f1": 0.848
+        }
+      ],
+      "notes50": [
+        {
+          "hits": 46,
+          "reference": 73,
+          "predicted": 64,
+          "precision": 0.71875,
+          "recall": 0.6301369863013698,
+          "f1": 0.6715328467153284
+        },
+        {
+          "hits": 45,
+          "reference": 61,
+          "predicted": 64,
+          "precision": 0.703125,
+          "recall": 0.7377049180327869,
+          "f1": 0.72
+        }
+      ],
+      "gpuPeakMiB": 885.65478515625
+    },
+    {
+      "id": "vocadito_2",
+      "singer": "S2",
+      "split": "heldout",
+      "duration": 30,
+      "milliseconds": 677.7096959995106,
+      "frame": {
+        "voiced": 3847,
+        "correct": 3580,
+        "detected": 3754,
+        "falseVoiced": 343,
+        "silent": 1321,
+        "pitchRecall": 0.930595269040811,
+        "voiceRecall": 0.9758253184299455,
+        "falseVoiceRate": 0.25965177895533686
+      },
+      "notes100": [
+        {
+          "hits": 37,
+          "reference": 65,
+          "predicted": 50,
+          "precision": 0.74,
+          "recall": 0.5692307692307692,
+          "f1": 0.6434782608695652
+        },
+        {
+          "hits": 36,
+          "reference": 54,
+          "predicted": 50,
+          "precision": 0.72,
+          "recall": 0.6666666666666666,
+          "f1": 0.6923076923076923
+        }
+      ],
+      "notes50": [
+        {
+          "hits": 33,
+          "reference": 65,
+          "predicted": 50,
+          "precision": 0.66,
+          "recall": 0.5076923076923077,
+          "f1": 0.5739130434782609
+        },
+        {
+          "hits": 33,
+          "reference": 54,
+          "predicted": 50,
+          "precision": 0.66,
+          "recall": 0.6111111111111112,
+          "f1": 0.6346153846153846
+        }
+      ],
+      "gpuPeakMiB": 884.77392578125
+    },
+    {
+      "id": "vocadito_20",
+      "singer": "S15",
+      "split": "heldout",
+      "duration": 8.713492063492064,
+      "milliseconds": 264.380736000021,
+      "frame": {
+        "voiced": 938,
+        "correct": 901,
+        "detected": 914,
+        "falseVoiced": 111,
+        "silent": 564,
+        "pitchRecall": 0.9605543710021321,
+        "voiceRecall": 0.9744136460554371,
+        "falseVoiceRate": 0.19680851063829788
+      },
+      "notes100": [
+        {
+          "hits": 21,
+          "reference": 31,
+          "predicted": 27,
+          "precision": 0.7777777777777778,
+          "recall": 0.6774193548387096,
+          "f1": 0.7241379310344828
+        },
+        {
+          "hits": 21,
+          "reference": 30,
+          "predicted": 27,
+          "precision": 0.7777777777777778,
+          "recall": 0.7,
+          "f1": 0.7368421052631579
+        }
+      ],
+      "notes50": [
+        {
+          "hits": 18,
+          "reference": 31,
+          "predicted": 27,
+          "precision": 0.6666666666666666,
+          "recall": 0.5806451612903226,
+          "f1": 0.6206896551724138
+        },
+        {
+          "hits": 19,
+          "reference": 30,
+          "predicted": 27,
+          "precision": 0.7037037037037037,
+          "recall": 0.6333333333333333,
+          "f1": 0.6666666666666666
+        }
+      ],
+      "gpuPeakMiB": 865.61962890625
+    },
+    {
+      "id": "vocadito_21",
+      "singer": "S16",
+      "split": "dev",
+      "duration": 22,
+      "milliseconds": 546.835146000376,
+      "frame": {
+        "voiced": 2972,
+        "correct": 2743,
+        "detected": 2860,
+        "falseVoiced": 367,
+        "silent": 818,
+        "pitchRecall": 0.9229475100942126,
+        "voiceRecall": 0.9623149394347241,
+        "falseVoiceRate": 0.44865525672371637
+      },
+      "notes100": [
+        {
+          "hits": 47,
+          "reference": 97,
+          "predicted": 66,
+          "precision": 0.7121212121212122,
+          "recall": 0.4845360824742268,
+          "f1": 0.5766871165644172
+        },
+        {
+          "hits": 39,
+          "reference": 62,
+          "predicted": 66,
+          "precision": 0.5909090909090909,
+          "recall": 0.6290322580645161,
+          "f1": 0.609375
+        }
+      ],
+      "notes50": [
+        {
+          "hits": 39,
+          "reference": 97,
+          "predicted": 66,
+          "precision": 0.5909090909090909,
+          "recall": 0.4020618556701031,
+          "f1": 0.4785276073619632
+        },
+        {
+          "hits": 28,
+          "reference": 62,
+          "predicted": 66,
+          "precision": 0.42424242424242425,
+          "recall": 0.45161290322580644,
+          "f1": 0.4375
+        }
+      ],
+      "gpuPeakMiB": 877.353515625
+    },
+    {
+      "id": "vocadito_22",
+      "singer": "S17",
+      "split": "dev",
+      "duration": 18.333492063492063,
+      "milliseconds": 467.587511999227,
+      "frame": {
+        "voiced": 1800,
+        "correct": 1746,
+        "detected": 1764,
+        "falseVoiced": 150,
+        "silent": 1359,
+        "pitchRecall": 0.97,
+        "voiceRecall": 0.98,
+        "falseVoiceRate": 0.11037527593818984
+      },
+      "notes100": [
+        {
+          "hits": 29,
+          "reference": 45,
+          "predicted": 40,
+          "precision": 0.725,
+          "recall": 0.6444444444444445,
+          "f1": 0.6823529411764706
+        },
+        {
+          "hits": 32,
+          "reference": 47,
+          "predicted": 40,
+          "precision": 0.8,
+          "recall": 0.6808510638297872,
+          "f1": 0.735632183908046
+        }
+      ],
+      "notes50": [
+        {
+          "hits": 27,
+          "reference": 45,
+          "predicted": 40,
+          "precision": 0.675,
+          "recall": 0.6,
+          "f1": 0.6352941176470588
+        },
+        {
+          "hits": 30,
+          "reference": 47,
+          "predicted": 40,
+          "precision": 0.75,
+          "recall": 0.6382978723404256,
+          "f1": 0.6896551724137931
+        }
+      ],
+      "gpuPeakMiB": 872.2470703125
+    },
+    {
+      "id": "vocadito_23",
+      "singer": "S18",
+      "split": "dev",
+      "duration": 18.037823129251702,
+      "milliseconds": 469.50460500011104,
+      "frame": {
+        "voiced": 1966,
+        "correct": 1770,
+        "detected": 1863,
+        "falseVoiced": 136,
+        "silent": 1142,
+        "pitchRecall": 0.9003051881993896,
+        "voiceRecall": 0.9476093591047813,
+        "falseVoiceRate": 0.1190893169877408
+      },
+      "notes100": [
+        {
+          "hits": 35,
+          "reference": 53,
+          "predicted": 49,
+          "precision": 0.7142857142857143,
+          "recall": 0.660377358490566,
+          "f1": 0.6862745098039216
+        },
+        {
+          "hits": 35,
+          "reference": 51,
+          "predicted": 49,
+          "precision": 0.7142857142857143,
+          "recall": 0.6862745098039216,
+          "f1": 0.7
+        }
+      ],
+      "notes50": [
+        {
+          "hits": 34,
+          "reference": 53,
+          "predicted": 49,
+          "precision": 0.6938775510204082,
+          "recall": 0.6415094339622641,
+          "f1": 0.6666666666666666
+        },
+        {
+          "hits": 33,
+          "reference": 51,
+          "predicted": 49,
+          "precision": 0.673469387755102,
+          "recall": 0.6470588235294118,
+          "f1": 0.66
+        }
+      ],
+      "gpuPeakMiB": 872.8125
+    },
+    {
+      "id": "vocadito_24",
+      "singer": "S19",
+      "split": "dev",
+      "duration": 14.757823129251701,
+      "milliseconds": 393.2111989997793,
+      "frame": {
+        "voiced": 1642,
+        "correct": 1620,
+        "detected": 1630,
+        "falseVoiced": 474,
+        "silent": 901,
+        "pitchRecall": 0.9866017052375152,
+        "voiceRecall": 0.9926918392204629,
+        "falseVoiceRate": 0.5260821309655938
+      },
+      "notes100": [
+        {
+          "hits": 26,
+          "reference": 39,
+          "predicted": 31,
+          "precision": 0.8387096774193549,
+          "recall": 0.6666666666666666,
+          "f1": 0.7428571428571429
+        },
+        {
+          "hits": 25,
+          "reference": 30,
+          "predicted": 31,
+          "precision": 0.8064516129032258,
+          "recall": 0.8333333333333334,
+          "f1": 0.819672131147541
+        }
+      ],
+      "notes50": [
+        {
+          "hits": 25,
+          "reference": 39,
+          "predicted": 31,
+          "precision": 0.8064516129032258,
+          "recall": 0.6410256410256411,
+          "f1": 0.7142857142857143
+        },
+        {
+          "hits": 24,
+          "reference": 30,
+          "predicted": 31,
+          "precision": 0.7741935483870968,
+          "recall": 0.8,
+          "f1": 0.7868852459016393
+        }
+      ],
+      "gpuPeakMiB": 869.298828125
+    },
+    {
+      "id": "vocadito_25",
+      "singer": "S20",
+      "split": "heldout",
+      "duration": 14.657823129251701,
+      "milliseconds": 381.1250620001374,
+      "frame": {
+        "voiced": 1704,
+        "correct": 1672,
+        "detected": 1689,
+        "falseVoiced": 200,
+        "silent": 822,
+        "pitchRecall": 0.9812206572769953,
+        "voiceRecall": 0.9911971830985915,
+        "falseVoiceRate": 0.24330900243309003
+      },
+      "notes100": [
+        {
+          "hits": 29,
+          "reference": 38,
+          "predicted": 32,
+          "precision": 0.90625,
+          "recall": 0.7631578947368421,
+          "f1": 0.8285714285714286
+        },
+        {
+          "hits": 28,
+          "reference": 33,
+          "predicted": 32,
+          "precision": 0.875,
+          "recall": 0.8484848484848485,
+          "f1": 0.8615384615384616
+        }
+      ],
+      "notes50": [
+        {
+          "hits": 25,
+          "reference": 38,
+          "predicted": 32,
+          "precision": 0.78125,
+          "recall": 0.6578947368421053,
+          "f1": 0.7142857142857143
+        },
+        {
+          "hits": 24,
+          "reference": 33,
+          "predicted": 32,
+          "precision": 0.75,
+          "recall": 0.7272727272727273,
+          "f1": 0.7384615384615385
+        }
+      ],
+      "gpuPeakMiB": 869.28369140625
+    },
+    {
+      "id": "vocadito_26",
+      "singer": "S21",
+      "split": "heldout",
+      "duration": 12.8578231292517,
+      "milliseconds": 326.4318750007078,
+      "frame": {
+        "voiced": 1465,
+        "correct": 1373,
+        "detected": 1392,
+        "falseVoiced": 155,
+        "silent": 750,
+        "pitchRecall": 0.9372013651877134,
+        "voiceRecall": 0.9501706484641638,
+        "falseVoiceRate": 0.20666666666666667
+      },
+      "notes100": [
+        {
+          "hits": 45,
+          "reference": 73,
+          "predicted": 52,
+          "precision": 0.8653846153846154,
+          "recall": 0.6164383561643836,
+          "f1": 0.72
+        },
+        {
+          "hits": 42,
+          "reference": 56,
+          "predicted": 52,
+          "precision": 0.8076923076923077,
+          "recall": 0.75,
+          "f1": 0.7777777777777778
+        }
+      ],
+      "notes50": [
+        {
+          "hits": 43,
+          "reference": 73,
+          "predicted": 52,
+          "precision": 0.8269230769230769,
+          "recall": 0.589041095890411,
+          "f1": 0.688
+        },
+        {
+          "hits": 40,
+          "reference": 56,
+          "predicted": 52,
+          "precision": 0.7692307692307693,
+          "recall": 0.7142857142857143,
+          "f1": 0.7407407407407407
+        }
+      ],
+      "gpuPeakMiB": 868.9677734375
+    },
+    {
+      "id": "vocadito_27",
+      "singer": "S22",
+      "split": "heldout",
+      "duration": 14.0178231292517,
+      "milliseconds": 341.5075600005366,
+      "frame": {
+        "voiced": 1455,
+        "correct": 1413,
+        "detected": 1426,
+        "falseVoiced": 221,
+        "silent": 960,
+        "pitchRecall": 0.9711340206185567,
+        "voiceRecall": 0.9800687285223367,
+        "falseVoiceRate": 0.23020833333333332
+      },
+      "notes100": [
+        {
+          "hits": 26,
+          "reference": 34,
+          "predicted": 30,
+          "precision": 0.8666666666666667,
+          "recall": 0.7647058823529411,
+          "f1": 0.8125
+        },
+        {
+          "hits": 27,
+          "reference": 28,
+          "predicted": 30,
+          "precision": 0.9,
+          "recall": 0.9642857142857143,
+          "f1": 0.9310344827586207
+        }
+      ],
+      "notes50": [
+        {
+          "hits": 22,
+          "reference": 34,
+          "predicted": 30,
+          "precision": 0.7333333333333333,
+          "recall": 0.6470588235294118,
+          "f1": 0.6875
+        },
+        {
+          "hits": 24,
+          "reference": 28,
+          "predicted": 30,
+          "precision": 0.8,
+          "recall": 0.8571428571428571,
+          "f1": 0.8275862068965517
+        }
+      ],
+      "gpuPeakMiB": 869.171875
+    },
+    {
+      "id": "vocadito_28",
+      "singer": "S21",
+      "split": "heldout",
+      "duration": 12.8978231292517,
+      "milliseconds": 323.1784380004683,
+      "frame": {
+        "voiced": 1514,
+        "correct": 1454,
+        "detected": 1462,
+        "falseVoiced": 43,
+        "silent": 708,
+        "pitchRecall": 0.9603698811096433,
+        "voiceRecall": 0.9656538969616909,
+        "falseVoiceRate": 0.06073446327683616
+      },
+      "notes100": [
+        {
+          "hits": 29,
+          "reference": 44,
+          "predicted": 39,
+          "precision": 0.7435897435897436,
+          "recall": 0.6590909090909091,
+          "f1": 0.6987951807228916
+        },
+        {
+          "hits": 29,
+          "reference": 43,
+          "predicted": 39,
+          "precision": 0.7435897435897436,
+          "recall": 0.6744186046511628,
+          "f1": 0.7073170731707317
+        }
+      ],
+      "notes50": [
+        {
+          "hits": 27,
+          "reference": 44,
+          "predicted": 39,
+          "precision": 0.6923076923076923,
+          "recall": 0.6136363636363636,
+          "f1": 0.6506024096385542
+        },
+        {
+          "hits": 26,
+          "reference": 43,
+          "predicted": 39,
+          "precision": 0.6666666666666666,
+          "recall": 0.6046511627906976,
+          "f1": 0.6341463414634146
+        }
+      ],
+      "gpuPeakMiB": 868.978515625
+    },
+    {
+      "id": "vocadito_29",
+      "singer": "S23",
+      "split": "dev",
+      "duration": 14.893492063492063,
+      "milliseconds": 379.6189630011213,
+      "frame": {
+        "voiced": 1820,
+        "correct": 1791,
+        "detected": 1798,
+        "falseVoiced": 183,
+        "silent": 746,
+        "pitchRecall": 0.984065934065934,
+        "voiceRecall": 0.987912087912088,
+        "falseVoiceRate": 0.2453083109919571
+      },
+      "notes100": [
+        {
+          "hits": 24,
+          "reference": 36,
+          "predicted": 31,
+          "precision": 0.7741935483870968,
+          "recall": 0.6666666666666666,
+          "f1": 0.7164179104477612
+        },
+        {
+          "hits": 22,
+          "reference": 32,
+          "predicted": 31,
+          "precision": 0.7096774193548387,
+          "recall": 0.6875,
+          "f1": 0.6984126984126984
+        }
+      ],
+      "notes50": [
+        {
+          "hits": 23,
+          "reference": 36,
+          "predicted": 31,
+          "precision": 0.7419354838709677,
+          "recall": 0.6388888888888888,
+          "f1": 0.6865671641791045
+        },
+        {
+          "hits": 21,
+          "reference": 32,
+          "predicted": 31,
+          "precision": 0.6774193548387096,
+          "recall": 0.65625,
+          "f1": 0.6666666666666666
+        }
+      ],
+      "gpuPeakMiB": 869.3310546875
+    },
+    {
+      "id": "vocadito_3",
+      "singer": "S1",
+      "split": "dev",
+      "duration": 21.736326530612246,
+      "milliseconds": 538.6703280000802,
+      "frame": {
+        "voiced": 2206,
+        "correct": 2153,
+        "detected": 2160,
+        "falseVoiced": 59,
+        "silent": 1539,
+        "pitchRecall": 0.9759746146872167,
+        "voiceRecall": 0.9791477787851315,
+        "falseVoiceRate": 0.03833658219623132
+      },
+      "notes100": [
+        {
+          "hits": 42,
+          "reference": 51,
+          "predicted": 44,
+          "precision": 0.9545454545454546,
+          "recall": 0.8235294117647058,
+          "f1": 0.8842105263157894
+        },
+        {
+          "hits": 39,
+          "reference": 46,
+          "predicted": 44,
+          "precision": 0.8863636363636364,
+          "recall": 0.8478260869565217,
+          "f1": 0.8666666666666667
+        }
+      ],
+      "notes50": [
+        {
+          "hits": 38,
+          "reference": 51,
+          "predicted": 44,
+          "precision": 0.8636363636363636,
+          "recall": 0.7450980392156863,
+          "f1": 0.8
+        },
+        {
+          "hits": 35,
+          "reference": 46,
+          "predicted": 44,
+          "precision": 0.7954545454545454,
+          "recall": 0.7608695652173914,
+          "f1": 0.7777777777777778
+        }
+      ],
+      "gpuPeakMiB": 875.140625
+    },
+    {
+      "id": "vocadito_30",
+      "singer": "S24",
+      "split": "dev",
+      "duration": 13.0178231292517,
+      "milliseconds": 316.79774800068117,
+      "frame": {
+        "voiced": 1222,
+        "correct": 1186,
+        "detected": 1204,
+        "falseVoiced": 257,
+        "silent": 1021,
+        "pitchRecall": 0.9705400981996727,
+        "voiceRecall": 0.9852700490998363,
+        "falseVoiceRate": 0.2517140058765916
+      },
+      "notes100": [
+        {
+          "hits": 30,
+          "reference": 58,
+          "predicted": 41,
+          "precision": 0.7317073170731707,
+          "recall": 0.5172413793103449,
+          "f1": 0.6060606060606061
+        },
+        {
+          "hits": 26,
+          "reference": 40,
+          "predicted": 41,
+          "precision": 0.6341463414634146,
+          "recall": 0.65,
+          "f1": 0.6419753086419753
+        }
+      ],
+      "notes50": [
+        {
+          "hits": 28,
+          "reference": 58,
+          "predicted": 41,
+          "precision": 0.6829268292682927,
+          "recall": 0.4827586206896552,
+          "f1": 0.5656565656565656
+        },
+        {
+          "hits": 24,
+          "reference": 40,
+          "predicted": 41,
+          "precision": 0.5853658536585366,
+          "recall": 0.6,
+          "f1": 0.5925925925925926
+        }
+      ],
+      "gpuPeakMiB": 868.99658203125
+    },
+    {
+      "id": "vocadito_31",
+      "singer": "S23",
+      "split": "dev",
+      "duration": 14.033492063492064,
+      "milliseconds": 382.2387179989164,
+      "frame": {
+        "voiced": 1404,
+        "correct": 1359,
+        "detected": 1373,
+        "falseVoiced": 324,
+        "silent": 1014,
+        "pitchRecall": 0.967948717948718,
+        "voiceRecall": 0.9779202279202279,
+        "falseVoiceRate": 0.31952662721893493
+      },
+      "notes100": [
+        {
+          "hits": 33,
+          "reference": 47,
+          "predicted": 40,
+          "precision": 0.825,
+          "recall": 0.7021276595744681,
+          "f1": 0.7586206896551724
+        },
+        {
+          "hits": 30,
+          "reference": 38,
+          "predicted": 40,
+          "precision": 0.75,
+          "recall": 0.7894736842105263,
+          "f1": 0.7692307692307693
+        }
+      ],
+      "notes50": [
+        {
+          "hits": 28,
+          "reference": 47,
+          "predicted": 40,
+          "precision": 0.7,
+          "recall": 0.5957446808510638,
+          "f1": 0.6436781609195402
+        },
+        {
+          "hits": 27,
+          "reference": 38,
+          "predicted": 40,
+          "precision": 0.675,
+          "recall": 0.7105263157894737,
+          "f1": 0.6923076923076923
+        }
+      ],
+      "gpuPeakMiB": 869.1767578125
+    },
+    {
+      "id": "vocadito_32",
+      "singer": "S25",
+      "split": "dev",
+      "duration": 25.033492063492062,
+      "milliseconds": 609.547586998815,
+      "frame": {
+        "voiced": 2654,
+        "correct": 2610,
+        "detected": 2628,
+        "falseVoiced": 481,
+        "silent": 1659,
+        "pitchRecall": 0.9834212509419744,
+        "voiceRecall": 0.9902034664657121,
+        "falseVoiceRate": 0.2899336949969861
+      },
+      "notes100": [
+        {
+          "hits": 39,
+          "reference": 57,
+          "predicted": 47,
+          "precision": 0.8297872340425532,
+          "recall": 0.6842105263157895,
+          "f1": 0.75
+        },
+        {
+          "hits": 39,
+          "reference": 55,
+          "predicted": 47,
+          "precision": 0.8297872340425532,
+          "recall": 0.7090909090909091,
+          "f1": 0.7647058823529411
+        }
+      ],
+      "notes50": [
+        {
+          "hits": 35,
+          "reference": 57,
+          "predicted": 47,
+          "precision": 0.7446808510638298,
+          "recall": 0.6140350877192983,
+          "f1": 0.6730769230769231
+        },
+        {
+          "hits": 35,
+          "reference": 55,
+          "predicted": 47,
+          "precision": 0.7446808510638298,
+          "recall": 0.6363636363636364,
+          "f1": 0.6862745098039216
+        }
+      ],
+      "gpuPeakMiB": 879.7919921875
+    },
+    {
+      "id": "vocadito_33",
+      "singer": "S26",
+      "split": "dev",
+      "duration": 30,
+      "milliseconds": 680.9150010012672,
+      "frame": {
+        "voiced": 3373,
+        "correct": 3228,
+        "detected": 3285,
+        "falseVoiced": 340,
+        "silent": 1795,
+        "pitchRecall": 0.9570115624073525,
+        "voiceRecall": 0.9739104654610139,
+        "falseVoiceRate": 0.1894150417827298
+      },
+      "notes100": [
+        {
+          "hits": 48,
+          "reference": 80,
+          "predicted": 69,
+          "precision": 0.6956521739130435,
+          "recall": 0.6,
+          "f1": 0.6442953020134228
+        },
+        {
+          "hits": 50,
+          "reference": 87,
+          "predicted": 69,
+          "precision": 0.7246376811594203,
+          "recall": 0.5747126436781609,
+          "f1": 0.6410256410256411
+        }
+      ],
+      "notes50": [
+        {
+          "hits": 46,
+          "reference": 80,
+          "predicted": 69,
+          "precision": 0.6666666666666666,
+          "recall": 0.575,
+          "f1": 0.6174496644295302
+        },
+        {
+          "hits": 47,
+          "reference": 87,
+          "predicted": 69,
+          "precision": 0.6811594202898551,
+          "recall": 0.5402298850574713,
+          "f1": 0.6025641025641025
+        }
+      ],
+      "gpuPeakMiB": 884.78271484375
+    },
+    {
+      "id": "vocadito_34",
+      "singer": "S27",
+      "split": "dev",
+      "duration": 24.853492063492062,
+      "milliseconds": 604.5665719993849,
+      "frame": {
+        "voiced": 3138,
+        "correct": 3078,
+        "detected": 3106,
+        "falseVoiced": 294,
+        "silent": 1144,
+        "pitchRecall": 0.9808795411089866,
+        "voiceRecall": 0.9898024219247928,
+        "falseVoiceRate": 0.256993006993007
+      },
+      "notes100": [
+        {
+          "hits": 59,
+          "reference": 89,
+          "predicted": 68,
+          "precision": 0.8676470588235294,
+          "recall": 0.6629213483146067,
+          "f1": 0.7515923566878981
+        },
+        {
+          "hits": 53,
+          "reference": 95,
+          "predicted": 68,
+          "precision": 0.7794117647058824,
+          "recall": 0.5578947368421052,
+          "f1": 0.6503067484662577
+        }
+      ],
+      "notes50": [
+        {
+          "hits": 58,
+          "reference": 89,
+          "predicted": 68,
+          "precision": 0.8529411764705882,
+          "recall": 0.651685393258427,
+          "f1": 0.7388535031847133
+        },
+        {
+          "hits": 49,
+          "reference": 95,
+          "predicted": 68,
+          "precision": 0.7205882352941176,
+          "recall": 0.5157894736842106,
+          "f1": 0.6012269938650306
+        }
+      ],
+      "gpuPeakMiB": 879.6572265625
+    },
+    {
+      "id": "vocadito_35",
+      "singer": "S28",
+      "split": "heldout",
+      "duration": 13.8,
+      "milliseconds": 347.2710290006944,
+      "frame": {
+        "voiced": 1654,
+        "correct": 1624,
+        "detected": 1631,
+        "falseVoiced": 52,
+        "silent": 724,
+        "pitchRecall": 0.9818621523579202,
+        "voiceRecall": 0.9860943168077388,
+        "falseVoiceRate": 0.0718232044198895
+      },
+      "notes100": [
+        {
+          "hits": 24,
+          "reference": 37,
+          "predicted": 31,
+          "precision": 0.7741935483870968,
+          "recall": 0.6486486486486487,
+          "f1": 0.7058823529411765
+        },
+        {
+          "hits": 17,
+          "reference": 26,
+          "predicted": 31,
+          "precision": 0.5483870967741935,
+          "recall": 0.6538461538461539,
+          "f1": 0.5964912280701754
+        }
+      ],
+      "notes50": [
+        {
+          "hits": 24,
+          "reference": 37,
+          "predicted": 31,
+          "precision": 0.7741935483870968,
+          "recall": 0.6486486486486487,
+          "f1": 0.7058823529411765
+        },
+        {
+          "hits": 16,
+          "reference": 26,
+          "predicted": 31,
+          "precision": 0.5161290322580645,
+          "recall": 0.6153846153846154,
+          "f1": 0.5614035087719298
+        }
+      ],
+      "gpuPeakMiB": 869.12744140625
+    },
+    {
+      "id": "vocadito_36",
+      "singer": "S28",
+      "split": "heldout",
+      "duration": 23.2778231292517,
+      "milliseconds": 563.8337039999897,
+      "frame": {
+        "voiced": 2612,
+        "correct": 2577,
+        "detected": 2584,
+        "falseVoiced": 159,
+        "silent": 1398,
+        "pitchRecall": 0.9866003062787136,
+        "voiceRecall": 0.9892802450229708,
+        "falseVoiceRate": 0.11373390557939914
+      },
+      "notes100": [
+        {
+          "hits": 48,
+          "reference": 67,
+          "predicted": 56,
+          "precision": 0.8571428571428571,
+          "recall": 0.7164179104477612,
+          "f1": 0.7804878048780488
+        },
+        {
+          "hits": 45,
+          "reference": 54,
+          "predicted": 56,
+          "precision": 0.8035714285714286,
+          "recall": 0.8333333333333334,
+          "f1": 0.8181818181818182
+        }
+      ],
+      "notes50": [
+        {
+          "hits": 43,
+          "reference": 67,
+          "predicted": 56,
+          "precision": 0.7678571428571429,
+          "recall": 0.6417910447761194,
+          "f1": 0.6991869918699187
+        },
+        {
+          "hits": 43,
+          "reference": 54,
+          "predicted": 56,
+          "precision": 0.7678571428571429,
+          "recall": 0.7962962962962963,
+          "f1": 0.7818181818181819
+        }
+      ],
+      "gpuPeakMiB": 878.33056640625
+    },
+    {
+      "id": "vocadito_37",
+      "singer": "S29",
+      "split": "heldout",
+      "duration": 30,
+      "milliseconds": 676.8220470003143,
+      "frame": {
+        "voiced": 4056,
+        "correct": 4044,
+        "detected": 4046,
+        "falseVoiced": 181,
+        "silent": 1112,
+        "pitchRecall": 0.9970414201183432,
+        "voiceRecall": 0.997534516765286,
+        "falseVoiceRate": 0.16276978417266186
+      },
+      "notes100": [
+        {
+          "hits": 28,
+          "reference": 41,
+          "predicted": 34,
+          "precision": 0.8235294117647058,
+          "recall": 0.6829268292682927,
+          "f1": 0.7466666666666667
+        },
+        {
+          "hits": 23,
+          "reference": 34,
+          "predicted": 34,
+          "precision": 0.6764705882352942,
+          "recall": 0.6764705882352942,
+          "f1": 0.6764705882352942
+        }
+      ],
+      "notes50": [
+        {
+          "hits": 27,
+          "reference": 41,
+          "predicted": 34,
+          "precision": 0.7941176470588235,
+          "recall": 0.6585365853658537,
+          "f1": 0.72
+        },
+        {
+          "hits": 22,
+          "reference": 34,
+          "predicted": 34,
+          "precision": 0.6470588235294118,
+          "recall": 0.6470588235294118,
+          "f1": 0.6470588235294118
+        }
+      ],
+      "gpuPeakMiB": 885.09375
+    },
+    {
+      "id": "vocadito_38",
+      "singer": "S29",
+      "split": "heldout",
+      "duration": 27.84,
+      "milliseconds": 671.2295929992251,
+      "frame": {
+        "voiced": 2463,
+        "correct": 2419,
+        "detected": 2432,
+        "falseVoiced": 499,
+        "silent": 2333,
+        "pitchRecall": 0.9821356069833537,
+        "voiceRecall": 0.9874137231019082,
+        "falseVoiceRate": 0.2138876982426061
+      },
+      "notes100": [
+        {
+          "hits": 54,
+          "reference": 78,
+          "predicted": 66,
+          "precision": 0.8181818181818182,
+          "recall": 0.6923076923076923,
+          "f1": 0.75
+        },
+        {
+          "hits": 52,
+          "reference": 64,
+          "predicted": 66,
+          "precision": 0.7878787878787878,
+          "recall": 0.8125,
+          "f1": 0.8
+        }
+      ],
+      "notes50": [
+        {
+          "hits": 53,
+          "reference": 78,
+          "predicted": 66,
+          "precision": 0.803030303030303,
+          "recall": 0.6794871794871795,
+          "f1": 0.7361111111111112
+        },
+        {
+          "hits": 47,
+          "reference": 64,
+          "predicted": 66,
+          "precision": 0.7121212121212122,
+          "recall": 0.734375,
+          "f1": 0.7230769230769231
+        }
+      ],
+      "gpuPeakMiB": 882.697265625
+    },
+    {
+      "id": "vocadito_39",
+      "singer": "S29",
+      "split": "heldout",
+      "duration": 30,
+      "milliseconds": 678.8631140007055,
+      "frame": {
+        "voiced": 3926,
+        "correct": 3915,
+        "detected": 3916,
+        "falseVoiced": 319,
+        "silent": 1242,
+        "pitchRecall": 0.9971981660723382,
+        "voiceRecall": 0.9974528782475802,
+        "falseVoiceRate": 0.25684380032206117
+      },
+      "notes100": [
+        {
+          "hits": 57,
+          "reference": 91,
+          "predicted": 72,
+          "precision": 0.7916666666666666,
+          "recall": 0.6263736263736264,
+          "f1": 0.6993865030674846
+        },
+        {
+          "hits": 43,
+          "reference": 66,
+          "predicted": 72,
+          "precision": 0.5972222222222222,
+          "recall": 0.6515151515151515,
+          "f1": 0.6231884057971014
+        }
+      ],
+      "notes50": [
+        {
+          "hits": 47,
+          "reference": 91,
+          "predicted": 72,
+          "precision": 0.6527777777777778,
+          "recall": 0.5164835164835165,
+          "f1": 0.5766871165644172
+        },
+        {
+          "hits": 36,
+          "reference": 66,
+          "predicted": 72,
+          "precision": 0.5,
+          "recall": 0.5454545454545454,
+          "f1": 0.5217391304347826
+        }
+      ],
+      "gpuPeakMiB": 884.78125
+    },
+    {
+      "id": "vocadito_4",
+      "singer": "S3",
+      "split": "heldout",
+      "duration": 18.456009070294783,
+      "milliseconds": 442.8387389998534,
+      "frame": {
+        "voiced": 2463,
+        "correct": 2347,
+        "detected": 2365,
+        "falseVoiced": 120,
+        "silent": 717,
+        "pitchRecall": 0.952902963865205,
+        "voiceRecall": 0.9602111246447422,
+        "falseVoiceRate": 0.16736401673640167
+      },
+      "notes100": [
+        {
+          "hits": 35,
+          "reference": 69,
+          "predicted": 49,
+          "precision": 0.7142857142857143,
+          "recall": 0.5072463768115942,
+          "f1": 0.5932203389830508
+        },
+        {
+          "hits": 36,
+          "reference": 51,
+          "predicted": 49,
+          "precision": 0.7346938775510204,
+          "recall": 0.7058823529411765,
+          "f1": 0.72
+        }
+      ],
+      "notes50": [
+        {
+          "hits": 31,
+          "reference": 69,
+          "predicted": 49,
+          "precision": 0.6326530612244898,
+          "recall": 0.4492753623188406,
+          "f1": 0.5254237288135594
+        },
+        {
+          "hits": 30,
+          "reference": 51,
+          "predicted": 49,
+          "precision": 0.6122448979591837,
+          "recall": 0.5882352941176471,
+          "f1": 0.6
+        }
+      ],
+      "gpuPeakMiB": 872.3828125
+    },
+    {
+      "id": "vocadito_40",
+      "singer": "S9",
+      "split": "heldout",
+      "duration": 18.5778231292517,
+      "milliseconds": 468.46194099998684,
+      "frame": {
+        "voiced": 2042,
+        "correct": 2000,
+        "detected": 2027,
+        "falseVoiced": 465,
+        "silent": 1159,
+        "pitchRecall": 0.9794319294809011,
+        "voiceRecall": 0.9926542605288933,
+        "falseVoiceRate": 0.4012079378774806
+      },
+      "notes100": [
+        {
+          "hits": 26,
+          "reference": 45,
+          "predicted": 37,
+          "precision": 0.7027027027027027,
+          "recall": 0.5777777777777777,
+          "f1": 0.6341463414634146
+        },
+        {
+          "hits": 26,
+          "reference": 36,
+          "predicted": 37,
+          "precision": 0.7027027027027027,
+          "recall": 0.7222222222222222,
+          "f1": 0.7123287671232876
+        }
+      ],
+      "notes50": [
+        {
+          "hits": 25,
+          "reference": 45,
+          "predicted": 37,
+          "precision": 0.6756756756756757,
+          "recall": 0.5555555555555556,
+          "f1": 0.6097560975609756
+        },
+        {
+          "hits": 23,
+          "reference": 36,
+          "predicted": 37,
+          "precision": 0.6216216216216216,
+          "recall": 0.6388888888888888,
+          "f1": 0.6301369863013698
+        }
+      ],
+      "gpuPeakMiB": 874.0302734375
+    },
+    {
+      "id": "vocadito_5",
+      "singer": "S4",
+      "split": "heldout",
+      "duration": 23.23199546485261,
+      "milliseconds": 531.2872550002794,
+      "frame": {
+        "voiced": 2895,
+        "correct": 2854,
+        "detected": 2871,
+        "falseVoiced": 378,
+        "silent": 1108,
+        "pitchRecall": 0.9858376511226252,
+        "voiceRecall": 0.9917098445595854,
+        "falseVoiceRate": 0.34115523465703973
+      },
+      "notes100": [
+        {
+          "hits": 58,
+          "reference": 96,
+          "predicted": 71,
+          "precision": 0.8169014084507042,
+          "recall": 0.6041666666666666,
+          "f1": 0.6946107784431138
+        },
+        {
+          "hits": 50,
+          "reference": 72,
+          "predicted": 71,
+          "precision": 0.704225352112676,
+          "recall": 0.6944444444444444,
+          "f1": 0.6993006993006993
+        }
+      ],
+      "notes50": [
+        {
+          "hits": 51,
+          "reference": 96,
+          "predicted": 71,
+          "precision": 0.7183098591549296,
+          "recall": 0.53125,
+          "f1": 0.6107784431137725
+        },
+        {
+          "hits": 46,
+          "reference": 72,
+          "predicted": 71,
+          "precision": 0.647887323943662,
+          "recall": 0.6388888888888888,
+          "f1": 0.6433566433566433
+        }
+      ],
+      "gpuPeakMiB": 878.3388671875
+    },
+    {
+      "id": "vocadito_6",
+      "singer": "S5",
+      "split": "heldout",
+      "duration": 23.831995464852607,
+      "milliseconds": 580.0062660000549,
+      "frame": {
+        "voiced": 2813,
+        "correct": 2755,
+        "detected": 2777,
+        "falseVoiced": 170,
+        "silent": 1293,
+        "pitchRecall": 0.979381443298969,
+        "voiceRecall": 0.9872022751510843,
+        "falseVoiceRate": 0.131477184841454
+      },
+      "notes100": [
+        {
+          "hits": 39,
+          "reference": 73,
+          "predicted": 51,
+          "precision": 0.7647058823529411,
+          "recall": 0.5342465753424658,
+          "f1": 0.6290322580645161
+        },
+        {
+          "hits": 38,
+          "reference": 50,
+          "predicted": 51,
+          "precision": 0.7450980392156863,
+          "recall": 0.76,
+          "f1": 0.7524752475247525
+        }
+      ],
+      "notes50": [
+        {
+          "hits": 37,
+          "reference": 73,
+          "predicted": 51,
+          "precision": 0.7254901960784313,
+          "recall": 0.5068493150684932,
+          "f1": 0.5967741935483871
+        },
+        {
+          "hits": 35,
+          "reference": 50,
+          "predicted": 51,
+          "precision": 0.6862745098039216,
+          "recall": 0.7,
+          "f1": 0.693069306930693
+        }
+      ],
+      "gpuPeakMiB": 878.67578125
+    },
+    {
+      "id": "vocadito_7",
+      "singer": "S6",
+      "split": "dev",
+      "duration": 19.46734693877551,
+      "milliseconds": 492.8259420012182,
+      "frame": {
+        "voiced": 1996,
+        "correct": 1974,
+        "detected": 1982,
+        "falseVoiced": 216,
+        "silent": 1358,
+        "pitchRecall": 0.9889779559118237,
+        "voiceRecall": 0.9929859719438878,
+        "falseVoiceRate": 0.15905743740795286
+      },
+      "notes100": [
+        {
+          "hits": 38,
+          "reference": 47,
+          "predicted": 44,
+          "precision": 0.8636363636363636,
+          "recall": 0.8085106382978723,
+          "f1": 0.8351648351648352
+        },
+        {
+          "hits": 34,
+          "reference": 42,
+          "predicted": 44,
+          "precision": 0.7727272727272727,
+          "recall": 0.8095238095238095,
+          "f1": 0.7906976744186046
+        }
+      ],
+      "notes50": [
+        {
+          "hits": 34,
+          "reference": 47,
+          "predicted": 44,
+          "precision": 0.7727272727272727,
+          "recall": 0.723404255319149,
+          "f1": 0.7472527472527473
+        },
+        {
+          "hits": 32,
+          "reference": 42,
+          "predicted": 44,
+          "precision": 0.7272727272727273,
+          "recall": 0.7619047619047619,
+          "f1": 0.7441860465116279
+        }
+      ],
+      "gpuPeakMiB": 873.2060546875
+    },
+    {
+      "id": "vocadito_8",
+      "singer": "S1",
+      "split": "dev",
+      "duration": 17.041632653061225,
+      "milliseconds": 416.29986699990695,
+      "frame": {
+        "voiced": 1545,
+        "correct": 1517,
+        "detected": 1525,
+        "falseVoiced": 58,
+        "silent": 1391,
+        "pitchRecall": 0.9818770226537217,
+        "voiceRecall": 0.9870550161812298,
+        "falseVoiceRate": 0.041696621135873475
+      },
+      "notes100": [
+        {
+          "hits": 35,
+          "reference": 40,
+          "predicted": 35,
+          "precision": 1,
+          "recall": 0.875,
+          "f1": 0.9333333333333333
+        },
+        {
+          "hits": 35,
+          "reference": 37,
+          "predicted": 35,
+          "precision": 1,
+          "recall": 0.9459459459459459,
+          "f1": 0.9722222222222222
+        }
+      ],
+      "notes50": [
+        {
+          "hits": 35,
+          "reference": 40,
+          "predicted": 35,
+          "precision": 1,
+          "recall": 0.875,
+          "f1": 0.9333333333333333
+        },
+        {
+          "hits": 35,
+          "reference": 37,
+          "predicted": 35,
+          "precision": 1,
+          "recall": 0.9459459459459459,
+          "f1": 0.9722222222222222
+        }
+      ],
+      "gpuPeakMiB": 870.63623046875
+    },
+    {
+      "id": "vocadito_9",
+      "singer": "S6",
+      "split": "dev",
+      "duration": 20.375011337868482,
+      "milliseconds": 493.7875329997041,
+      "frame": {
+        "voiced": 2071,
+        "correct": 2003,
+        "detected": 2020,
+        "falseVoiced": 173,
+        "silent": 1439,
+        "pitchRecall": 0.9671656204732013,
+        "voiceRecall": 0.975374215354901,
+        "falseVoiceRate": 0.1202223766504517
+      },
+      "notes100": [
+        {
+          "hits": 46,
+          "reference": 62,
+          "predicted": 53,
+          "precision": 0.8679245283018868,
+          "recall": 0.7419354838709677,
+          "f1": 0.8
+        },
+        {
+          "hits": 44,
+          "reference": 59,
+          "predicted": 53,
+          "precision": 0.8301886792452831,
+          "recall": 0.7457627118644068,
+          "f1": 0.7857142857142857
+        }
+      ],
+      "notes50": [
+        {
+          "hits": 41,
+          "reference": 62,
+          "predicted": 53,
+          "precision": 0.7735849056603774,
+          "recall": 0.6612903225806451,
+          "f1": 0.7130434782608696
+        },
+        {
+          "hits": 41,
+          "reference": 59,
+          "predicted": 53,
+          "precision": 0.7735849056603774,
+          "recall": 0.6949152542372882,
+          "f1": 0.7321428571428571
+        }
+      ],
+      "gpuPeakMiB": 873.89501953125
+    }
+  ],
+  "limits": "30-second prefixes, two human annotations averaged, MIDI-rounded pitch, note offsets not scored. Reserved singers inspected during development; this is regression evidence, not an unseen test. RSH is unlabeled and not scored."
+}

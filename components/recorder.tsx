@@ -586,7 +586,7 @@ export function Recorder({
               </p>
             )}
             <p className="privacy-note">
-              Your microphone recording stays in this browser.
+              Your microphone recording stays on this computer.
             </p>
           </>
         ) : (

@@ -1,4 +1,5 @@
 import type { MusicalIntent } from './types';
+import { PremiumAnalysis } from './premium-analysis';
 
 // Keep the model warm between takes. Cancellation terminates actual computation.
 export class AnalysisClient {
@@ -100,4 +101,5 @@ const analyzer = new AnalysisClient();
 export function prepareUnderstanding() {
   if (typeof Worker !== 'undefined') analyzer.prepare();
 }
-export const analyzeRecording = analyzer.analyze.bind(analyzer);
+const premium = new PremiumAnalysis(analyzer.analyze.bind(analyzer));
+export const analyzeRecording = premium.analyze;
