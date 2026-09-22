@@ -1,0 +1,7 @@
+[Unit]
+Description=Allow same-origin microphone access for TapComposer
+After=nginx.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/python3 /usr/local/lib/tapcomposer/allow-microphone.py

@@ -1,0 +1,9 @@
+[Unit]
+Description=Preserve TapComposer microphone permission after proxy updates
+
+[Path]
+PathChanged=/etc/nginx/sites-available/serverchirp-cmucpqz6100ng0qanwxw7j8i8.conf
+Unit=tapcomposer-microphone.service
+
+[Install]
+WantedBy=multi-user.target

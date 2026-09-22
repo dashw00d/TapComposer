@@ -29,6 +29,8 @@ Open http://localhost:3003 for a local container check. The image builds the app
 
 On ServerChirp, use the Container stack with this repository's `main` branch, build context `.`, `Dockerfile`, and a primary HTTP port of 3000. Route `tapcomposer.dashwood.net` to the server and enable HTTPS so microphone recording works. Push-to-deploy rebuilds the container after GitHub pushes.
 
+ServerChirp's default proxy header blocks microphones. On BigBoy, the small `deploy/tapcomposer-microphone.path` service watches this app's generated Nginx file and runs `deploy/allow-microphone.py` to keep `microphone=(self)` after deployments and certificate updates. It validates Nginx before reloading. The script is installed at `/usr/local/lib/tapcomposer/allow-microphone.py`, and the two units are installed in `/etc/systemd/system` with the path unit enabled. This adjustment is specific to this app's ServerChirp ID; update the paths if recreating the app. Verify `Permissions-Policy` and a recording after changing the proxy configuration.
+
 No database, volume, or GPU service is required for the composer and Tuning Center. Songs and recordings stay in each browser; use project downloads to move songs between devices. The optional Premium GPU service requires separate configuration; the Docker deployment defaults to the local browser tools.
 
 ## Making a song
