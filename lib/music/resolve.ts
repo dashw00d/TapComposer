@@ -1,5 +1,5 @@
 import { chordAt } from './harmony';
-import { cleanHumIntent } from './phrase-cleanup';
+import { cleanHumIntent, stabilizeHum } from './phrase-cleanup';
 import type {
   MusicalIntent,
   SongContext,
@@ -9,6 +9,7 @@ import type {
 } from './types';
 const clamp = (n: number, a: number, b: number) => Math.max(a, Math.min(b, n));
 export function inferContext(intent: MusicalIntent): SongContext {
+  intent = stabilizeHum(intent);
   const intervals = intent.events
     .slice(1)
     .map((e, i) => e.time - intent.events[i].time)
@@ -147,7 +148,7 @@ export function resolveIntent(
             : clamp(
                 e.duration * (instrument === 'strings' && !smoother ? 1.12 : 1),
                 0.08,
-                8,
+                intent.source === 'hum' ? 120 : 8,
               ),
         note: instrument === 'piano' ? clamp(note, 36, 84) : note,
         velocity: clamp(e.intensity * 0.82 + 0.12, 0.25, 0.95),
@@ -157,6 +158,7 @@ export function resolveIntent(
   // A new melodic onset releases the preceding note, avoiding unintended smears.
   if (
     instrument === 'piano' &&
+    !smoother &&
     intent.source === 'hum' &&
     !intent.events.some(
       (event, index) =>

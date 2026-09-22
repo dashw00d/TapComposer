@@ -59,6 +59,17 @@ export function trimQuietEdges(track: Track): Track {
   };
 }
 
+/** Fit a repeating pattern to whole bars without cutting the final note. */
+export function fitLoopToNotes(track: Track, tempo = 100): Track {
+  if (!track.events.length) return track;
+  const trimmed = trimQuietEdges(track);
+  const bar = (4 * 60) / (track.sourceTempo ?? tempo);
+  return {
+    ...trimmed,
+    duration: Math.max(bar, Math.ceil((trimmed.duration - 1e-8) / bar) * bar),
+  };
+}
+
 const NOTE_NAMES = [
   'C',
   'C♯',

@@ -3,6 +3,7 @@ import { useEffect, useEffectEvent, useRef, useState } from 'react';
 import Link from 'next/link';
 import {
   GitBranch,
+  Disc3,
   AudioLines,
   Guitar,
   Music2,
@@ -47,7 +48,13 @@ import {
 import { CompositionPanel, MixControls } from './composition-panel';
 import { useSongHistory } from '@/hooks/use-song-history';
 import { INSTRUMENTS } from '@/lib/music/instruments';
-import { arrangedTracks, keepIdea } from '@/lib/music/composition';
+import {
+  arrangedTracks,
+  keepIdea,
+  composeSong,
+  DEFAULT_COMPOSE,
+  FEELS,
+} from '@/lib/music/composition';
 import { exportProject, importProject } from '@/lib/music/project';
 import { exportMidi } from '@/lib/music/midi';
 import { Switch } from '@/components/ui/switch';
@@ -72,11 +79,13 @@ import {
 } from '@/lib/music/types';
 import { Recorder } from './recorder';
 import { SongTimeline } from './song-timeline';
+import { SongSpotlight } from './song-spotlight';
 
 export default function Composer() {
   const history = useSongHistory();
   const { song, load: loadSong } = history;
   const [mixOpen, setMixOpen] = useState(false);
+  const [spotlightOpen, setSpotlightOpen] = useState(false);
   const [proposal, setProposal] = useState<{
     label: string;
     before: Song;
@@ -389,6 +398,7 @@ export default function Composer() {
     if (!song || song.tracks.length) return;
     const composed = makeDemoSong(song);
     updateSong(() => composed);
+    void play(arrangedTracks(composed), 'all');
     let premium = true;
     try {
       premium = localStorage.getItem('tapcomposer-service') !== 'free';
@@ -404,18 +414,27 @@ export default function Composer() {
           // The example is a real ACE-Step rendering of this exact musical arrangement.
           if (mounted.current && currentSongId.current === composed.id) {
             const latest = latestSong.current ?? composed;
-            updateSong(() => ({
+            if (
+              !latest.tracks.some(
+                (track) => track.id === composed.tracks[0].id,
+              ) ||
+              latest.premiumTakes?.length
+            )
+              return;
+            history.edit({
               ...latest,
               premiumTakes: [
                 {
                   id: 'premium-example',
+                  // Event-time metadata after the example download finishes.
+                  // oxlint-disable-next-line react/react-compiler
                   createdAt: Date.now(),
                   duration: songDuration(arrangedTracks(composed)) + 0.7,
                   fingerprint: songFingerprint(composed),
                   audio,
                 },
               ],
-            }));
+            });
           }
           return;
         }
@@ -423,7 +442,6 @@ export default function Composer() {
         /* The editable example remains usable without the service or asset. */
       }
     }
-    void play(arrangedTracks(composed), 'all');
   }
   const tracks = song?.tracks ?? [],
     detail = tracks.find((t) => t.id === detailId);
@@ -431,6 +449,17 @@ export default function Composer() {
   const duration = songDuration(transportTracks),
     canPlay = transportTracks.some((t) => !t.muted && t.events.length);
   const position = playing ? progress * playedDuration : seekAt;
+  const backing = tracks.filter((track) => track.generated);
+  const backingProtected =
+    backing.length > 0 &&
+    backing.every(
+      (track) =>
+        track.pinned ||
+        song?.sections?.some(
+          (section) => section.pinned && section.trackIds.includes(track.id),
+        ),
+    );
+  const feel = song?.compose?.feel ?? DEFAULT_COMPOSE.feel;
   const icons = {
     piano: Piano,
     drums: Drum,
@@ -591,151 +620,221 @@ export default function Composer() {
             })}
           </section>
         </details>
-        <section className="song-section" aria-label="Your song">
-          <div className="section-heading">
-            <div>
-              <p className="eyebrow">YOUR WORK IN PLAY</p>
-              <input
-                className="song-name"
-                aria-label="Song name"
-                key={song?.id ?? 'loading'}
-                defaultValue={song?.name ?? 'My little song'}
-                maxLength={60}
-                disabled={!song}
-                onBlur={(e) => {
-                  const name = e.target.value.trim() || 'My little song';
-                  e.target.value = name;
-                  if (name !== song?.name) updateSong((s) => ({ ...s, name }));
-                }}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') e.currentTarget.blur();
-                }}
-              />
-            </div>
+        {!tracks.length && (
+          <section className="first-song" aria-label="Getting started">
             <button
-              className="button primary"
-              disabled={!canPlay || loading}
-              onClick={() => play(transportTracks, 'all')}
+              className="example-launch"
+              disabled={!song}
+              onClick={() => void demo()}
             >
-              {loading ? (
-                <LoaderCircle className="spin" size={18} />
-              ) : playing === 'all' ? (
-                <Square size={17} />
-              ) : (
-                <Play size={18} />
-              )}{' '}
-              {loading
-                ? 'Getting ready…'
-                : playing === 'all'
-                  ? 'Stop playing'
-                  : 'Play my song'}
+              <span className="example-disc" aria-hidden="true">
+                <Play size={26} />
+              </span>
+              <span>
+                <strong>Take it for a spin.</strong>
+                <span>Play an example, change the vibe, make it yours.</span>
+                <b>
+                  No microphone needed <ArrowUpRight size={16} />
+                </b>
+              </span>
             </button>
-          </div>
-          <div className="studio-toolbar">
-            <span className="workspace-label">Song workspace</span>
-            <div className="history-actions">
+            <ol className="first-song-steps">
+              <li>
+                <span>01</span>
+                <div>
+                  <strong>Make a little noise</strong>
+                  <p>Hum a few notes or tap a beat. A few seconds is plenty.</p>
+                </div>
+              </li>
+              <li>
+                <span>02</span>
+                <div>
+                  <strong>Meet your backing band</strong>
+                  <p>
+                    Pick a sound. We’ll add chords, bass, and a beat around you.
+                  </p>
+                </div>
+              </li>
+              <li>
+                <span>03</span>
+                <div>
+                  <strong>Give it your own spin</strong>
+                  <p>
+                    Try a different feel, add another idea, then save your song.
+                  </p>
+                </div>
+              </li>
+            </ol>
+          </section>
+        )}
+        {tracks.length > 0 && (
+          <section className="song-section" aria-label="Your song">
+            <div className="section-heading">
+              <div>
+                <p className="eyebrow">YOUR WORK IN PLAY</p>
+                <input
+                  className="song-name"
+                  aria-label="Song name"
+                  key={song?.id ?? 'loading'}
+                  defaultValue={song?.name ?? 'My little song'}
+                  maxLength={60}
+                  disabled={!song}
+                  onBlur={(e) => {
+                    const name = e.target.value.trim() || 'My little song';
+                    e.target.value = name;
+                    if (name !== song?.name)
+                      updateSong((s) => ({ ...s, name }));
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') e.currentTarget.blur();
+                  }}
+                />
+              </div>
               <button
-                className="icon-button"
-                aria-label="Save another direction"
-                title="Save another direction"
-                disabled={!song?.tracks.length}
-                onClick={() => {
-                  stop();
-                  setBranchName(
-                    `${song?.name ?? 'My song'} · another direction`.slice(
-                      0,
-                      60,
-                    ),
-                  );
-                  setBranchOpen(true);
-                }}
+                className="button primary"
+                disabled={!canPlay || loading}
+                onClick={() => play(transportTracks, 'all')}
               >
-                <GitBranch size={19} />
-              </button>
-              <button
-                className="icon-button"
-                aria-label="Undo"
-                title="Undo · Ctrl/⌘ Z"
-                disabled={!history.canUndo}
-                onClick={() => {
-                  stop();
-                  history.undo();
-                }}
-              >
-                <Undo2 size={19} />
-              </button>
-              <button
-                className="icon-button"
-                aria-label="Redo"
-                title="Redo · Ctrl/⌘ Shift Z"
-                disabled={!history.canRedo}
-                onClick={() => {
-                  stop();
-                  history.redo();
-                }}
-              >
-                <Redo2 size={19} />
-              </button>
-              <button
-                className="button"
-                disabled={!tracks.length}
-                aria-expanded={mixOpen}
-                onClick={() => setMixOpen((open) => !open)}
-              >
-                <SlidersHorizontal size={17} /> Volume & balance
-              </button>
-            </div>
-          </div>
-          {tracks.length > 0 && (
-            <div className="transport-line">
-              <span>
-                {Math.floor(position / 60)}:
-                {String(Math.floor(position % 60)).padStart(2, '0')}
-              </span>
-              <Slider
-                aria-label="Playback position"
-                value={[
-                  seekDraft ?? (duration ? (position / duration) * 100 : 0),
-                ]}
-                onValueChange={(value) =>
-                  setSeekDraft(Array.isArray(value) ? value[0] : value)
-                }
-                min={0}
-                max={100}
-                onValueCommitted={(value) => {
-                  setSeekDraft(null);
-                  const offset =
-                    ((Array.isArray(value) ? value[0] : value) / 100) *
-                    duration;
-                  void play(
-                    transportTracks,
-                    'all',
-                    Math.min(offset, Math.max(0, duration - 0.1)),
-                    true,
-                  );
-                }}
-              />
-              <span>
-                {Math.floor(duration / 60)}:
-                {String(Math.floor(duration % 60)).padStart(2, '0')}
-              </span>
-            </div>
-          )}
-          {song && mixOpen && <MixControls song={song} update={updateMusic} />}
-          {tracks.length === 0 ? (
-            <div className="empty-song">
-              <AudioLines size={38} />
-              <h3>A little quiet in here.</h3>
-              <p>Hum an idea or tap a rhythm. Your song starts with you.</p>
-              <button
-                className="text-button example-button"
-                disabled={!song}
-                onClick={demo}
-              >
-                Or hear a little example <Play size={14} />
+                {loading ? (
+                  <LoaderCircle className="spin" size={18} />
+                ) : playing === 'all' ? (
+                  <Square size={17} />
+                ) : (
+                  <Play size={18} />
+                )}{' '}
+                {loading
+                  ? 'Getting ready…'
+                  : playing === 'all'
+                    ? 'Stop playing'
+                    : 'Play my song'}
               </button>
             </div>
-          ) : (
+            <fieldset
+              className="vibe-strip"
+              aria-label="Choose the backing feel"
+            >
+              <span>Find your vibe</span>
+              {FEELS.map((option) => (
+                <button
+                  key={option.id}
+                  className={`vibe-button vibe-${option.id}`}
+                  aria-pressed={feel === option.id}
+                  disabled={backingProtected}
+                  title={option.description}
+                  onClick={() => {
+                    if (feel !== option.id)
+                      updateMusic((current) =>
+                        composeSong(current, { feel: option.id }),
+                      );
+                  }}
+                >
+                  {option.label}
+                </button>
+              ))}
+              <button
+                className="button spotlight-open"
+                disabled={!canPlay || loading}
+                onClick={() => {
+                  setSpotlightOpen(true);
+                  if (playing !== 'all') void play(transportTracks, 'all');
+                }}
+              >
+                <Disc3 size={18} /> Show off
+              </button>
+            </fieldset>
+            <div className="studio-toolbar">
+              <span className="workspace-label">Song workspace</span>
+              <div className="history-actions">
+                <button
+                  className="icon-button"
+                  aria-label="Save another direction"
+                  title="Save another direction"
+                  disabled={!song?.tracks.length}
+                  onClick={() => {
+                    stop();
+                    setBranchName(
+                      `${song?.name ?? 'My song'} · another direction`.slice(
+                        0,
+                        60,
+                      ),
+                    );
+                    setBranchOpen(true);
+                  }}
+                >
+                  <GitBranch size={19} />
+                </button>
+                <button
+                  className="icon-button"
+                  aria-label="Undo"
+                  title="Undo · Ctrl/⌘ Z"
+                  disabled={!history.canUndo}
+                  onClick={() => {
+                    stop();
+                    history.undo();
+                  }}
+                >
+                  <Undo2 size={19} />
+                </button>
+                <button
+                  className="icon-button"
+                  aria-label="Redo"
+                  title="Redo · Ctrl/⌘ Shift Z"
+                  disabled={!history.canRedo}
+                  onClick={() => {
+                    stop();
+                    history.redo();
+                  }}
+                >
+                  <Redo2 size={19} />
+                </button>
+                <button
+                  className="button"
+                  disabled={!tracks.length}
+                  aria-expanded={mixOpen}
+                  onClick={() => setMixOpen((open) => !open)}
+                >
+                  <SlidersHorizontal size={17} /> Volume & balance
+                </button>
+              </div>
+            </div>
+            {tracks.length > 0 && (
+              <div className="transport-line">
+                <span>
+                  {Math.floor(position / 60)}:
+                  {String(Math.floor(position % 60)).padStart(2, '0')}
+                </span>
+                <Slider
+                  aria-label="Playback position"
+                  value={[
+                    seekDraft ?? (duration ? (position / duration) * 100 : 0),
+                  ]}
+                  onValueChange={(value) =>
+                    setSeekDraft(Array.isArray(value) ? value[0] : value)
+                  }
+                  min={0}
+                  max={100}
+                  onValueCommitted={(value) => {
+                    setSeekDraft(null);
+                    const offset =
+                      ((Array.isArray(value) ? value[0] : value) / 100) *
+                      duration;
+                    void play(
+                      transportTracks,
+                      'all',
+                      Math.min(offset, Math.max(0, duration - 0.1)),
+                      true,
+                    );
+                  }}
+                />
+                <span>
+                  {Math.floor(duration / 60)}:
+                  {String(Math.floor(duration % 60)).padStart(2, '0')}
+                </span>
+              </div>
+            )}
+            {song && mixOpen && (
+              <MixControls song={song} update={updateMusic} />
+            )}
             <>
               {song && (
                 <SongTimeline
@@ -768,6 +867,9 @@ export default function Composer() {
                     void play(arrangedTracks(song), 'all', seconds, true)
                   }
                   onMore={setDetailId}
+                  onRerecord={(track) =>
+                    openRecorder(track.instrument, track.id)
+                  }
                   onUndo={() => {
                     stop();
                     history.undo();
@@ -800,37 +902,40 @@ export default function Composer() {
                 </button>
               </div>
             </>
-          )}
-          {song && tracks.length > 0 && (
-            <CompositionPanel
-              showSections={false}
-              song={song}
-              update={updateMusic}
-              onSeek={(seconds) =>
-                void play(arrangedTracks(song), 'all', seconds, true)
-              }
-              position={position}
-              onPropose={propose}
-            />
-          )}
-          {song && (
-            <PremiumStudio
-              key={song.id}
-              song={song}
-              engine={audioEngine}
-              onBeforePlay={stop}
-              originalPlaying={!!playing}
-              onKeep={(take) =>
-                updateSong((s) => ({
-                  ...s,
-                  premiumTakes: [take, ...(s.premiumTakes ?? [])].slice(0, 3),
-                }))
-              }
-            />
-          )}
-        </section>
+            {song && tracks.length > 0 && (
+              <CompositionPanel
+                showSections={false}
+                song={song}
+                update={updateMusic}
+                onSeek={(seconds) =>
+                  void play(arrangedTracks(song), 'all', seconds, true)
+                }
+                position={position}
+                onPropose={propose}
+              />
+            )}
+            {song && (
+              <PremiumStudio
+                key={song.id}
+                song={song}
+                engine={audioEngine}
+                onBeforePlay={stop}
+                originalPlaying={!!playing}
+                onKeep={(take) =>
+                  updateSong((s) => ({
+                    ...s,
+                    premiumTakes: [take, ...(s.premiumTakes ?? [])].slice(0, 3),
+                  }))
+                }
+              />
+            )}
+          </section>
+        )}
         <footer>
           <span>Made by you. A little help from TapComposer.</span>
+          <Link className="footer-link" href="/tuning">
+            Tuning Center
+          </Link>
           <button className="footer-link" onClick={() => setCredits(true)}>
             Sound credits & privacy
           </button>
@@ -848,6 +953,32 @@ export default function Composer() {
           e.target.value = '';
         }}
       />
+      {song && spotlightOpen && (
+        <SongSpotlight
+          song={song}
+          tracks={transportTracks}
+          open={spotlightOpen}
+          onOpenChange={setSpotlightOpen}
+          playing={playing === 'all'}
+          loading={loading}
+          position={position}
+          duration={duration}
+          onPlay={() => void play(transportTracks, 'all')}
+          onSeek={(seconds) =>
+            void play(
+              transportTracks,
+              'all',
+              Math.min(seconds, Math.max(0, duration - 0.1)),
+              true,
+            )
+          }
+          onSave={() => {
+            setSpotlightOpen(false);
+            setExportOpen(true);
+          }}
+          error={error}
+        />
+      )}
       {song && recorder && (
         <Recorder
           key={`${recorder.instrument}-${recorder.replaceId ?? 'new'}`}
@@ -1016,6 +1147,28 @@ export default function Composer() {
           <button
             className="export-option"
             disabled={exporting}
+            onClick={() => exportAudio('mp3')}
+          >
+            <div>
+              <strong>MP3</strong>
+              <span>A smaller file. Easy to send and share.</span>
+            </div>
+            <Download />
+          </button>
+          <button
+            className="export-option"
+            disabled={exporting}
+            onClick={() => exportAudio('wav')}
+          >
+            <div>
+              <strong>WAV</strong>
+              <span>Full-quality audio. Keep every detail.</span>
+            </div>
+            <Download />
+          </button>
+          <button
+            className="export-option"
+            disabled={exporting}
             onClick={() => void projectDownload()}
           >
             <div>
@@ -1035,28 +1188,6 @@ export default function Composer() {
             <div>
               <strong>MIDI</strong>
               <span>Take the notes into another music app.</span>
-            </div>
-            <Download />
-          </button>
-          <button
-            className="export-option"
-            disabled={exporting}
-            onClick={() => exportAudio('mp3')}
-          >
-            <div>
-              <strong>MP3</strong>
-              <span>A smaller file. Easy to send and share.</span>
-            </div>
-            <Download />
-          </button>
-          <button
-            className="export-option"
-            disabled={exporting}
-            onClick={() => exportAudio('wav')}
-          >
-            <div>
-              <strong>WAV</strong>
-              <span>Full-quality audio. Keep every detail.</span>
             </div>
             <Download />
           </button>

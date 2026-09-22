@@ -1,4 +1,4 @@
-import type { MusicalIntent } from './types';
+import type { MusicalIntent, VocalStyle } from './types';
 import { encodeWav } from './wav';
 
 type AnalysisTask = { result: Promise<MusicalIntent>; cancel: () => void };
@@ -7,6 +7,7 @@ type LocalAnalysis = (
   sampleRate: number,
   source: 'hum' | 'microphone-taps',
   onProgress?: (value: number) => void,
+  vocalStyle?: VocalStyle,
 ) => AnalysisTask;
 
 /** An explicit server entitlement gates audio upload; free recognition stays in-browser. */
@@ -24,9 +25,17 @@ export class PremiumAnalysis {
     },
   ) {}
 
-  analyze: LocalAnalysis = (pcm, sampleRate, source, onProgress) => {
+  analyze: LocalAnalysis = (
+    pcm,
+    sampleRate,
+    source,
+    onProgress,
+    vocalStyle,
+  ) => {
     this.active?.();
-    if (source !== 'hum' || !this.enabled()) {
+    // Defined Hmm takes use the same tested contour path as the Tuning Center.
+    // The learned server boundary model is still preferred for Daa/Baa/general singing.
+    if (source !== 'hum' || vocalStyle === 'hmm' || !this.enabled()) {
       const task = this.local(pcm, sampleRate, source, onProgress);
       this.active = task.cancel;
       return task;
@@ -122,6 +131,7 @@ export function validVoiceIntent(
       e.time + e.duration <= duration + 0.002 &&
       number(e.pitch, 20, 110) &&
       number(e.confidence, 0, 1) &&
+      (e.pitchDrift === undefined || typeof e.pitchDrift === 'boolean') &&
       number(e.intensity, 0, 1) &&
       (i === 0 ||
         e.time >= v.events[i - 1].time + v.events[i - 1].duration - 0.002),

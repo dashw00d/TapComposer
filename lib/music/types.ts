@@ -6,7 +6,10 @@ export type Instrument =
   | 'strings'
   | 'synth';
 export type InputSource = 'hum' | 'microphone-taps' | 'touch';
+export type VocalStyle = 'hmm' | 'daa' | 'baa';
 export interface IntentEvent {
+  /** Acoustic suggestion for reversible cleanup; raw pitches/times stay intact. */
+  pitchDrift?: boolean;
   time: number;
   duration: number;
   pitch: number | null;
@@ -14,6 +17,7 @@ export interface IntentEvent {
   intensity: number;
 }
 export interface MusicalIntent {
+  vocalStyle?: VocalStyle;
   analyzer?: 'crepe-tiny' | 'yin' | 'rosvot-crepe';
   version: 1;
   source: InputSource;

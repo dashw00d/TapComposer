@@ -1,6 +1,6 @@
 'use client';
 import { useRef, useState, type CSSProperties } from 'react';
-import { Volume2, VolumeX, X } from 'lucide-react';
+import { Mic, Volume2, VolumeX, X } from 'lucide-react';
 import { INSTRUMENTS, instrumentInfo } from '@/lib/music/instruments';
 import {
   changeInstrument,
@@ -25,6 +25,7 @@ export function SongTimeline({
   position,
   onSeek,
   onMore,
+  onRerecord,
   onUndo,
   canUndo,
 }: {
@@ -36,6 +37,7 @@ export function SongTimeline({
   position: number;
   onSeek: (seconds: number) => void;
   onMore: (id: string) => void;
+  onRerecord: (track: Track) => void;
   onUndo: () => void;
   canUndo: boolean;
 }) {
@@ -57,19 +59,20 @@ export function SongTimeline({
   const track = song.tracks.find((t) => t.id === selection?.trackId);
   const selected = clips.find((c) => c.id === selection?.clipId);
   const beat = 60 / (song.context?.tempo ?? 100);
+  const songEnd = Math.max(0, ...clips.map((c) => c.startBeat + c.lengthBeats));
   const length = Math.min(
     512,
     Math.max(
-      32,
+      8,
       Math.ceil(
         Math.max(
           0,
           ...clips.map((c) => c.startBeat + c.lengthBeats),
           draft ? draft.startBeat + draft.lengthBeats : 0,
-        ) / 16,
+        ) / 4,
       ) *
-        16 +
-        16,
+        4 +
+        4,
     ),
   );
   function selectPart(next: { trackId: string; clipId?: string }) {
@@ -92,7 +95,10 @@ export function SongTimeline({
       <div className="playlist-heading">
         <div>
           <strong>Arrange your song</strong>
-          <p>Move a block to move the music. Click one to edit its notes.</p>
+          <p>
+            {+(songEnd / 4).toFixed(2)} bars · {(songEnd * beat).toFixed(1)}{' '}
+            seconds. Click a block to edit its notes.
+          </p>
         </div>
         <div className="playlist-zoom">
           <button
@@ -155,14 +161,28 @@ export function SongTimeline({
                         ? 'Backing'
                         : 'Your recording'}
                   </span>
+                  <span>
+                    {getPatternBeats(t, song.context) / 4} bar loop ·{' '}
+                    {(getPatternBeats(t, song.context) * beat).toFixed(1)}s
+                  </span>
                 </button>
-                <button
-                  className="lane-mute"
-                  aria-label={`${t.muted ? 'Unmute' : 'Mute'} ${t.name}`}
-                  onClick={() => patchTrack({ ...t, muted: !t.muted })}
-                >
-                  {t.muted ? <VolumeX size={15} /> : <Volume2 size={15} />}
-                </button>
+                <div className="lane-actions">
+                  <button
+                    className="lane-mute"
+                    aria-label={`${t.muted ? 'Unmute' : 'Mute'} ${t.name}`}
+                    onClick={() => patchTrack({ ...t, muted: !t.muted })}
+                  >
+                    {t.muted ? <VolumeX size={15} /> : <Volume2 size={15} />}
+                  </button>
+                  <button
+                    className="lane-rerecord"
+                    aria-label={`Record ${t.name} again`}
+                    title={`Record ${t.name} again`}
+                    onClick={() => onRerecord(t)}
+                  >
+                    <Mic size={15} />
+                  </button>
+                </div>
               </div>
               <div
                 className="playlist-lane"
@@ -215,6 +235,7 @@ export function SongTimeline({
                         className="music-clip"
                         aria-label={`${t.name}, bar ${+(original.startBeat / 4 + 1).toFixed(2)}, ${+(original.lengthBeats / 4).toFixed(2)} bars`}
                         aria-pressed={selected?.id === clip.id}
+                        title={`${t.name}: ${(patternBeats * beat).toFixed(1)} second loop, ${clip.repeat ? 'repeats' : 'plays once'} inside this ${(clip.lengthBeats * beat).toFixed(1)} second block`}
                         style={{
                           left: clip.startBeat * zoom,
                           width: Math.max(8, clip.lengthBeats * zoom - 2),
@@ -310,7 +331,9 @@ export function SongTimeline({
                           }
                         }}
                       >
-                        <span className="clip-title">{t.name}</span>
+                        <span className="clip-title">
+                          {t.name} · {+(clip.lengthBeats / 4).toFixed(2)} bars
+                        </span>
                         <span className="clip-notes" aria-hidden="true">
                           {preview}
                         </span>
@@ -329,8 +352,9 @@ export function SongTimeline({
         </div>
       </div>
       <div className="playlist-hint">
-        Drag the right edge to shorten or repeat a block. Double-click an empty
-        lane to add one.
+        Song ends at {(songEnd * beat).toFixed(1)}s; empty space after it is for
+        arranging. Drag the right edge to shorten or repeat a block.
+        Double-click an empty lane to add one.
       </div>
       {track && (
         <div
@@ -363,7 +387,9 @@ export function SongTimeline({
           {selected && (
             <div className="clip-actions">
               <span>
-                Block at bar {+(selected.startBeat / 4 + 1).toFixed(2)}
+                Block at bar {+(selected.startBeat / 4 + 1).toFixed(2)} ·{' '}
+                {+(selected.lengthBeats / 4).toFixed(2)} bars ·{' '}
+                {(selected.lengthBeats * beat).toFixed(1)}s
               </span>
               <button
                 className="button"
@@ -416,6 +442,9 @@ export function SongTimeline({
                 {instrument.name}
               </button>
             ))}
+            <button className="button" onClick={() => onRerecord(track)}>
+              <Mic size={16} /> Record again
+            </button>
             <button className="text-button" onClick={() => onMore(track.id)}>
               More options
             </button>

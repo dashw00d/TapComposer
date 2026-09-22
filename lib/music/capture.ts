@@ -1,5 +1,5 @@
 import type { AudioEngine } from './audio';
-import type { MusicalIntent } from './types';
+import type { MusicalIntent, VocalStyle } from './types';
 import { encodeWav } from './wav';
 import { analyzeRecording } from './analysis-client';
 
@@ -13,10 +13,9 @@ export function alignCapturedIntent(
   intent: MusicalIntent,
   hasBacking: boolean,
 ): MusicalIntent {
-  // Counted microphone takes retain the full timeline, including a deliberate
-  // pause before the first note. Only a standalone tap-pad gesture starts on tap.
-  if (intent.source !== 'touch' || hasBacking || !intent.events.length)
-    return intent;
+  // Standalone phrases start at the first note. Backed takes keep their
+  // count-in alignment. This only adjusts notes; source PCM stays intact.
+  if (hasBacking || !intent.events.length) return intent;
   const trim = intent.events[0].time;
   return {
     ...intent,
@@ -24,7 +23,7 @@ export function alignCapturedIntent(
       ...e,
       time: Math.max(0, e.time - trim),
     })),
-    duration: Math.max(0, intent.duration - trim),
+    duration: Math.max(...intent.events.map((e) => e.time + e.duration)) - trim,
   };
 }
 export async function beginCapture(
@@ -106,9 +105,23 @@ export function understandRecording(
   sampleRate: number,
   source: 'hum' | 'microphone-taps',
   onProgress?: (value: number) => void,
+  vocalStyle?: VocalStyle,
 ): { original: Blob; result: Promise<MusicalIntent>; cancel: () => void } {
   const original = encodeWav([pcm], sampleRate);
-  return { original, ...analyzeRecording(pcm, sampleRate, source, onProgress) };
+  const task = analyzeRecording(
+    pcm,
+    sampleRate,
+    source,
+    onProgress,
+    vocalStyle,
+  );
+  return {
+    original,
+    ...task,
+    result: task.result.then((intent) =>
+      source === 'hum' && vocalStyle ? { ...intent, vocalStyle } : intent,
+    ),
+  };
 }
 export function microphoneError(error: unknown) {
   if (error instanceof DOMException) {

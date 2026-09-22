@@ -39,9 +39,14 @@ import type {
 } from '@/lib/music/types';
 import { layerIdea } from '@/lib/music/direct';
 import { Switch } from '@/components/ui/switch';
-import { patternTracks, changeInstrument } from '@/lib/music/composition';
+import {
+  patternTracks,
+  changeInstrument,
+  patternBeats,
+} from '@/lib/music/composition';
 import { INSTRUMENTS, instrumentInfo } from '@/lib/music/instruments';
 import { MAX_SECONDS } from '@/lib/music/types';
+import { VOCAL_STYLES, type VocalStyle } from '@/lib/voice-lab/protocol';
 
 interface Props {
   instrument: Instrument;
@@ -66,6 +71,7 @@ export function Recorder({
   onClose,
   onKeep,
 }: Props) {
+  const replacing = song.tracks.find((track) => track.id === replaceId);
   const [instrument, setInstrument] = useState(initialInstrument);
   const [chosen, setChosen] = useState<Instrument[]>([initialInstrument]);
   const [layering, setLayering] = useState(false);
@@ -74,9 +80,15 @@ export function Recorder({
     'ready' | 'requesting' | 'countdown' | 'recording' | 'analyzing' | 'review'
   >('ready');
   const [mode, setMode] = useState<'touch' | 'mic' | 'hum'>(
-    instrument === 'drums' ? 'touch' : 'hum',
+    replacing?.intent.source === 'microphone-taps'
+      ? 'mic'
+      : (replacing?.intent.source ??
+          (instrument === 'drums' ? 'touch' : 'hum')),
   );
   const [countdown, setCountdown] = useState(3);
+  const [vocalStyle, setVocalStyle] = useState<VocalStyle>(
+    replacing?.intent.vocalStyle ?? 'hmm',
+  );
   const [error, setError] = useState('');
   const [elapsed, setElapsed] = useState(0);
   const [level, setLevel] = useState(0);
@@ -159,13 +171,16 @@ export function Recorder({
       );
       return;
     }
-    const normalized = alignCapturedIntent(intent, backing.length > 0);
+    const normalized = alignCapturedIntent(
+      intent,
+      backing.some((t) => !t.muted),
+    );
     const hasMelody = song.tracks.some(
       (t) => !t.generated && t.intent.events.some((e) => e.pitch !== null),
     );
     const inferred = inferContext(normalized);
     context.current = song.context
-      ? !hasMelody && normalized.source === 'hum'
+      ? !replaceId && !hasMelody && normalized.source === 'hum'
         ? { ...inferred, tempo: song.context.tempo }
         : song.context
       : inferred;
@@ -173,7 +188,7 @@ export function Recorder({
       normalized,
       instrument,
       context.current,
-      false,
+      normalized.source === 'hum',
       true,
     );
     const previous = song.tracks.find((t) => t.id === replaceId);
@@ -187,7 +202,7 @@ export function Recorder({
       ...arrangement,
       original,
       muted: false,
-      smoother: false,
+      smoother: normalized.source === 'hum',
       sourceTempo: context.current.tempo,
     };
     setDraft(track);
@@ -210,6 +225,7 @@ export function Recorder({
         (progress) => {
           if (active.current) setAnalysisProgress(progress);
         },
+        mode === 'hum' ? vocalStyle : undefined,
       );
       analysisCancel.current = task.cancel;
       const intent = await task.result;
@@ -408,21 +424,31 @@ export function Recorder({
           )}
         </div>
         <DialogTitle className="dialog-title">
-          {phase === 'review'
-            ? 'Find its voice.'
-            : captureFirst
-              ? 'Start with your idea.'
-              : `${label}, your way.`}
+          {replacing
+            ? phase === 'review'
+              ? `A new take for ${replacing.name}.`
+              : `Record ${replacing.name} again.`
+            : phase === 'review'
+              ? 'Find its voice.'
+              : captureFirst
+                ? 'Start with your idea.'
+                : `${label}, your way.`}
         </DialogTitle>
         <DialogDescription className="dialog-description">
           {phase === 'review'
             ? 'Same idea, different instruments. Choose a sound to hear it.'
             : mode === 'hum'
-              ? 'Hum or sing your idea. A “hmm” or “dum dum” is enough.'
+              ? 'Hum with “hmm,” or sing “daa” or “baa.” Use one style for the whole take.'
               : mode === 'touch'
                 ? 'Tap the pad or press Space while it’s selected.'
                 : 'Tap a desk near your microphone. Leave a little space between taps.'}
         </DialogDescription>
+        {replacing && (
+          <p className="rerecord-note">
+            Your current take stays until you choose Keep new take. This
+            replaces the track everywhere it plays in your song.
+          </p>
+        )}
         {error && (
           <div className="error-box" role="alert">
             {error}
@@ -464,6 +490,43 @@ export function Recorder({
                 </button>
               </div>
             }
+            {mode === 'hum' && phase === 'ready' && (
+              <div className="gentle-details">
+                <label>
+                  Voice style{' '}
+                  <select
+                    aria-label="Voice style"
+                    value={vocalStyle}
+                    disabled={busy}
+                    onChange={(event) =>
+                      setVocalStyle(event.target.value as VocalStyle)
+                    }
+                  >
+                    {VOCAL_STYLES.map((style) => (
+                      <option key={style.id} value={style.id}>
+                        {style.label}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <p>
+                  {
+                    VOCAL_STYLES.find((style) => style.id === vocalStyle)
+                      ?.instruction
+                  }
+                </p>
+                <details>
+                  <summary>Three ways to hum or sing</summary>
+                  {VOCAL_STYLES.map((style) => (
+                    <p key={style.id}>
+                      <strong>{style.label}</strong>
+                      <br />
+                      {style.instruction}
+                    </p>
+                  ))}
+                </details>
+              </div>
+            )}
             <div
               className={`record-zone ${phase === 'recording' ? 'is-recording' : ''}`}
             >
@@ -691,7 +754,7 @@ export function Recorder({
                 <button
                   className="button"
                   aria-pressed={draft.smoother}
-                  title="Tidy uncertain notes and uneven loudness, then listen. Undo to compare."
+                  title="Join tiny interruptions, keep clear pauses, even the volume, and fit the phrase to a steady rhythm. Compare with the original detection."
                   onClick={() => {
                     const track = smoothTrack(draft, context.current!);
                     setDraft(track);
@@ -699,9 +762,24 @@ export function Recorder({
                   }}
                 >
                   <Sparkles size={17} />
-                  {draft.smoother ? 'Undo cleanup' : 'Clean up my take'}
+                  {draft.smoother ? 'Hear original timing' : 'Clean up my take'}
                 </button>
               </div>
+              <p className="dialog-description">
+                {draft.smoother
+                  ? 'Cleaned automatically · '
+                  : 'Original detection · '}
+                {patternBeats(draft, song.context) / 4} bar loop ·{' '}
+                {draft.duration.toFixed(1)} seconds.{' '}
+                {backing.some((t) => !t.muted)
+                  ? 'Aligned with your backing loop.'
+                  : 'Starts on your first note; the song will follow this phrase.'}
+              </p>
+              {replacing && (
+                <button className="button full" onClick={onClose}>
+                  Keep current take
+                </button>
+              )}
               <button
                 className="button primary full"
                 onClick={() => {
@@ -714,7 +792,7 @@ export function Recorder({
                   else onKeep(draft, context.current!);
                 }}
               >
-                <Check size={19} /> Keep it
+                <Check size={19} /> {replacing ? 'Keep new take' : 'Keep it'}
               </button>
             </>
           )

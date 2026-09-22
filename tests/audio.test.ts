@@ -55,7 +55,10 @@ void test('real samples render non-silent bounded stereo audio and both exports 
     const song = composeSong({ ...newSong(), context, tracks: [track] });
     const fullSong = arrangedTracks(song);
     const rendered = await engine.render(fullSong);
-    assert.ok(rendered.duration > 45, 'Expected a complete multi-section song');
+    assert.ok(
+      rendered.duration > 10 && rendered.duration < 45,
+      'Short phrases make compact complete songs',
+    );
     const lastSection = rendered
       .getChannelData(0)
       .slice(Math.floor((rendered.duration - 4) * 44100));

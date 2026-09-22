@@ -47,37 +47,52 @@ export const beatSeconds = (context: SongContext | null) =>
 export function keepIdea(song: Song, track: Track, context: SongContext): Song {
   if (song.harmonyPinned && song.context) context = song.context;
   const replacing = song.tracks.some((part) => part.id === track.id);
+  if (replacing) {
+    // A retake changes this performance, not the band or its arrangement.
+    return {
+      ...song,
+      context: song.context ?? context,
+      tracks: song.tracks.map((part) =>
+        part.id === track.id
+          ? {
+              ...track,
+              name: part.name,
+              muted: part.muted,
+              volume: part.volume,
+              pan: part.pan,
+              solo: part.solo,
+              pinned: part.pinned,
+              generated: false,
+            }
+          : part,
+      ),
+    };
+  }
   return composeSong({
     ...song,
     context,
-    clips:
-      song.clips && !replacing
-        ? [
-            ...song.clips,
-            ...songClips({
-              ...song,
-              clips: undefined,
-              tracks: [track],
-              sections: song.sections?.map((section) => ({
-                ...section,
-                trackIds: section.pinned ? [] : [track.id],
-                parts: undefined,
-              })),
-            }).map((c) => ({ ...c, id: crypto.randomUUID() })),
-          ].slice(0, 576)
-        : song.clips,
+    clips: song.clips
+      ? [
+          ...song.clips,
+          ...songClips({
+            ...song,
+            clips: undefined,
+            tracks: [track],
+            sections: song.sections?.map((section) => ({
+              ...section,
+              trackIds: section.pinned ? [] : [track.id],
+              parts: undefined,
+            })),
+          }).map((c) => ({ ...c, id: crypto.randomUUID() })),
+        ].slice(0, 576)
+      : song.clips,
     sections: song.sections?.map((section) => ({
       ...section,
-      trackIds:
-        replacing || section.pinned
-          ? section.trackIds
-          : [...section.trackIds, track.id],
+      trackIds: section.pinned
+        ? section.trackIds
+        : [...section.trackIds, track.id],
     })),
-    tracks: replacing
-      ? song.tracks.map((part) =>
-          part.id === track.id ? { ...track, generated: false } : part,
-        )
-      : [...song.tracks, { ...track, generated: false }],
+    tracks: [...song.tracks, { ...track, generated: false }],
   });
 }
 export const patternBeats = (track: Track, context: SongContext | null) =>
@@ -343,6 +358,38 @@ export function composeSong(
     ...originals,
     ...supporting.slice(0, Math.max(0, 24 - originals.length)),
   ];
+  // Short recordings get short backing loops instead of a mandatory four bars.
+  const phraseBars = Math.max(
+    1,
+    ...originals.map((t) => patternBeats(t, context) / 4),
+  );
+  for (const track of supporting) {
+    const previous = input.tracks.find(
+      (t) => t.generated && t.instrument === track.instrument,
+    );
+    track.duration =
+      (previous
+        ? patternBeats(previous, context) / 4
+        : Math.min(4, phraseBars)) *
+      4 *
+      beat;
+    track.events = track.events
+      .filter((e) => e.time < track.duration)
+      .map((e) => ({
+        ...e,
+        duration: Math.min(e.duration, track.duration - e.time),
+      }));
+    track.intent = {
+      ...track.intent,
+      duration: track.duration,
+      events: track.intent.events
+        .filter((e) => e.time < track.duration)
+        .map((e) => ({
+          ...e,
+          duration: Math.min(e.duration, track.duration - e.time),
+        })),
+    };
+  }
   // Reuse existing generated IDs, so selections and deliberate section choices remain stable on variation.
   for (const track of supporting) {
     const previous = input.tracks.find(
@@ -361,14 +408,15 @@ export function composeSong(
     .map((t) => t.id);
   const all = tracks.map((t) => t.id);
   const fullPhraseBars = Math.max(
-    8,
-    ...originals.map((track) => patternBeats(track, context) / 4),
+    2,
+    ...originals.map((track) => Math.min(32, patternBeats(track, context) / 2)),
   );
+  const transitionBars = Math.max(1, Math.min(4, Math.ceil(phraseBars / 2)));
   let sections: SongSection[] = [
     {
       id: crypto.randomUUID(),
       name: 'A way in',
-      bars: 4,
+      bars: transitionBars,
       energy: 0.5,
       trackIds: melodicIds.length ? melodicIds.slice(0, 2) : all.slice(0, 1),
     },
@@ -382,7 +430,7 @@ export function composeSong(
     {
       id: crypto.randomUUID(),
       name: 'Room to breathe',
-      bars: 4,
+      bars: transitionBars,
       energy: 0.5,
       trackIds: tracks.filter((t) => t.instrument !== 'drums').map((t) => t.id),
     },
@@ -396,7 +444,7 @@ export function composeSong(
     {
       id: crypto.randomUUID(),
       name: 'Let it settle',
-      bars: 4,
+      bars: transitionBars,
       energy: 0.45,
       trackIds: melodicIds.length ? melodicIds.slice(0, 2) : all.slice(0, 1),
     },

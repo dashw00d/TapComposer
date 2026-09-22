@@ -1,10 +1,27 @@
 """Align learned note regions to supported acoustic pitch, keeping the capture clock."""
 import numpy as np
+from voice_activity import voice_activity
+from voice_articulation import repeated_hum_attacks, split_hum_attacks, annotate_hum_drift
 
 
 def decode_notes(pitches, confidence, levels, hop, boundaries, duration):
+    pitches = np.array(pitches, dtype=float, copy=True)
+    pitches[~voice_activity(levels)] = np.nan
     events = []
-    cuts = sorted(set([0.0, *[float(b) for b in boundaries if 0 < b < duration], duration]))
+    # Learned boundaries can miss repeated hums. A sustained unvoiced interval
+    # is independent evidence of a rest, even when the same pitch resumes.
+    rests = []
+    i = 0
+    while i < len(pitches):
+        if np.isfinite(pitches[i]):
+            i += 1
+            continue
+        start = i
+        while i < len(pitches) and not np.isfinite(pitches[i]):
+            i += 1
+        if (i - start) * hop >= .06:
+            rests.extend([start * hop, min(duration, i * hop)])
+    cuts = sorted(set([0.0, *[float(b) for b in [*boundaries, *rests] if 0 < b < duration], duration]))
     for start, end in zip(cuts, cuts[1:]):
         begin = round(start / hop)
         finish = min(len(pitches), round(end / hop))
@@ -50,4 +67,5 @@ def decode_notes(pitches, confidence, levels, hop, boundaries, duration):
                 previous['confidence'] = float(np.mean(confidence[a:b]))
                 continue
         merged.append(event)
-    return merged
+    attacks = repeated_hum_attacks(pitches, confidence, levels, hop)
+    return annotate_hum_drift(split_hum_attacks(merged, attacks), pitches, levels, hop)

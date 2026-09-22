@@ -126,3 +126,35 @@ void test('a casual slide between two stable notes does not turn into a staircas
     [60, 64],
   );
 });
+
+void test('whole-clip context rejects pitched room sound around and between hums', () => {
+  for (const gain of [0.1, 1, 2]) {
+    const frames = Array.from({ length: 200 }, (_, i) => {
+      const voiced = (i >= 40 && i < 90) || (i >= 110 && i < 160);
+      return {
+        time: i * 0.02,
+        pitch: voiced ? 48 : 64,
+        confidence: 0.95,
+        rms: (voiced ? 0.15 : 0.02) * gain,
+      };
+    });
+    const original = structuredClone(frames);
+    const result = humFramesToIntent(frames, 0.02, 4);
+    assert.equal(result.events.length, 2);
+    assert.deepEqual(
+      result.events.map((e) => e.pitch),
+      [48, 48],
+    );
+    assert.ok(Math.abs(result.events[0].time - 0.8) < 0.03);
+    assert.ok(Math.abs(result.events[1].time - 2.2) < 0.03);
+    assert.ok(result.events[0].time + result.events[0].duration < 1.83);
+    assert.equal(result.duration, 4, 'capture clock must survive gating');
+    assert.deepEqual(frames, original);
+  }
+});
+
+void test('a continuous quiet hum does not require a leading room sample', () => {
+  const result = phrase((f) => ({ ...f, rms: 0.004 }));
+  assert.equal(result.events.length, 1);
+  assert.ok(result.events[0].duration > 1.5);
+});

@@ -4,16 +4,36 @@ export interface Note {
   pitch: number;
   duration: number;
 }
+/** Timing-only matching. Relative comparison explicitly removes just the first
+ * onset of each phrase; it must not be reported as absolute timing accuracy. */
+export function rhythmScore(
+  reference: Note[],
+  predicted: Note[],
+  relative = false,
+  tolerance = 0.1,
+) {
+  const timing = (notes: Note[]) =>
+    notes.map((note) => ({
+      ...note,
+      pitch: 60,
+      time: note.time - (relative ? (notes[0]?.time ?? 0) : 0),
+    }));
+  return noteScore(timing(reference), timing(predicted), tolerance);
+}
 export function noteScore(
   reference: Note[],
   predicted: Note[],
   tolerance = 0.1,
+  offsetRatio?: number,
 ) {
   // Maximum bipartite matching prevents duplicate predictions claiming one note.
   const edges = reference.map((r) =>
     predicted.flatMap((p, i) =>
       Math.abs(p.time - r.time) <= tolerance + 1e-8 &&
-      Math.abs(p.pitch - r.pitch) <= 0.5 + 1e-8
+      Math.abs(p.pitch - r.pitch) <= 0.5 + 1e-8 &&
+      (offsetRatio === undefined ||
+        Math.abs(p.time + p.duration - r.time - r.duration) <=
+          Math.max(0.05, r.duration * offsetRatio) + 1e-8)
         ? [i]
         : [],
     ),

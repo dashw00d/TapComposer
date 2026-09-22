@@ -1,6 +1,22 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { noteScore, frameScore } from '../scripts/voice-metrics';
+import { noteScore, frameScore, rhythmScore } from '../scripts/voice-metrics';
+void test('rhythm metrics separate pitch mistakes, start delay, and missing repetitions', () => {
+  const reference = [0, 0.5, 1].map((time) => ({
+    time: time + 1,
+    duration: 0.4,
+    pitch: 60,
+  }));
+  const delayed = reference.map((n) => ({
+    ...n,
+    time: n.time + 0.25,
+    pitch: 57,
+  }));
+  assert.equal(noteScore(reference, delayed).f1, 0);
+  assert.equal(rhythmScore(reference, delayed).f1, 0);
+  assert.equal(rhythmScore(reference, delayed, true).f1, 1);
+  assert.ok(rhythmScore(reference, delayed.slice(0, 2), true).f1 < 1);
+});
 void test('voice benchmark penalizes duplicates and does not align away timing or octave errors', () => {
   const reference = [{ time: 0.2, pitch: 60, duration: 0.5 }];
   assert.equal(

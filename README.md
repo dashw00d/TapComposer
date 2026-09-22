@@ -18,12 +18,29 @@ Microphone capture requires HTTPS or localhost and browser permission. Headphone
 
 The local server reads `.env.local` (see `.env.example`). The configured GPU services can be started with `systemctl --user start tapcomposer-ace tapcomposer-gateway`. The app and both inference services bind only to loopback.
 
+## Docker deployment
+
+```sh
+docker build -t tapcomposer .
+docker run --rm --name tapcomposer -p 127.0.0.1:3003:3000 tapcomposer
+```
+
+Open http://localhost:3003 for a local container check. The image builds the app and bundles its pitch model, WASM runtime, samples, and capture worklet. It listens on port 3000 and includes an HTTP health check. Local environment files and tuning recordings are excluded from the image.
+
+On ServerChirp, use the Container stack with this repository's `main` branch, build context `.`, `Dockerfile`, and a primary HTTP port of 3000. Route `tapcomposer.dashwood.net` to the server and enable HTTPS so microphone recording works. Push-to-deploy rebuilds the container after GitHub pushes.
+
+No database, volume, or GPU service is required for the composer and Tuning Center. Songs and recordings stay in each browser; use project downloads to move songs between devices. The optional Premium GPU service requires separate configuration; the Docker deployment defaults to the local browser tools.
+
 ## Making a song
+
+New here? **Take it for a spin** plays an editable example immediately, without a microphone. **Find your vibe** switches between four backing styles while the song plays; Undo brings the previous arrangement back. **Show off** opens a focused listening view with a spinning record, instrument lights following the actual notes, section shortcuts, and audio downloads. Reduced-motion preferences keep the record still.
 
 1. Start with **Hum an idea** or **Tap a rhythm**, then audition piano, drums, bass, guitar, strings, or synth. Expand the instrument drawer to choose a sound before recording. Every instrument accepts every input.
 2. For humming or desk taps, click **Start recording**. The microphone and sounds prepare first; a visible **3–2–1 → Start** countdown leads into capture. Click **Stop recording** when finished, or cancel during the countdown. Capture and backing share an audio-clock start, and leading silence stays part of the take. Hear an interpretation, retry or smooth it, then keep it. Optional controls layer several instruments from the same recording and audition them with the song. The first idea establishes a pulse and provisional key. Taps become chords, bass movement or a melody according to the chosen instrument.
 3. Keeping an idea automatically creates complementary backing and a five-section song. A hummed melody informs the harmony; your original performance and recording remain available.
-4. The playlist shows tracks down the left and bars across the top. Drag colored blocks to move them; pull their right edge to shorten or repeat them. Click a bar number to play from there. Select a block to duplicate or delete it, or double-click an empty lane to add one. Deleting a block keeps its source part available.
+4. Use the microphone button beside any track, or **Record again** beside its sound choices, to retry just that part. The recorder remembers how you entered it. Listen to the new take, then choose **Keep new take** or **Keep current take**. Replacement preserves the track’s name, mix, and placement and leaves the rest of the song untouched; Undo restores the old take.
+
+   The playlist shows tracks down the left and bars across the top. Drag colored blocks to move them; pull their right edge to shorten or repeat them. Click a bar number to play from there. Select a block to duplicate or delete it, or double-click an empty lane to add one. Deleting a block keeps its source part available.
 5. Click a block or track name to open its notes underneath. The grid labels every pitch (C, D, F♯ and so on). New notes and vertical edits stay in the song’s key; timing lands on a magnetic quarter-beat grid. Recorded accidentals remain intact when only timing changes. Drag notes vertically for pitch and horizontally for timing; pull the right edge for length. Double-click empty space to add a note. Drums have named kick, snare and hi-hat rows. Select a note and press **Delete note** to remove it. **Trim empty edges** removes leading and trailing silence from the editable part. These edits apply to every block of that part; original audio and musical intent remain intact.
 6. Choose **Sound** beside the notes to change the instrument, including automatic backing such as Warm chords. Manual note edits stay protected through sound changes and automatic composition. **More options** contains musical directions, renaming, copying a part, replacing its recording and removal. **Volume & balance** reveals labeled volume and position sliders with live values, Hear alone, and overall volume. Hear alone selects one part at a time. **Song settings** contains feel, backing intensity, tempo and harmony protection. **Try another version** previews changed backing before you keep it; manually placed blocks stay in place.
 7. Play, seek and repeat the song. Save the full arrangement as stereo WAV, 192 kbps MP3, or MIDI. Download a project backup to move an editable song, including original audio and manually placed blocks, to another browser.
@@ -37,6 +54,10 @@ The app supports 24 parts, 30 seconds per take, 12 sections and at most 512 beat
 Keyboard in the playlist: left/right arrows move a selected block by a beat; Shift plus arrows resize it; Delete removes it. In the note grid, arrows change pitch or timing, Shift plus left/right changes length, and Delete removes a note. Each drag is one undo step.
 
 Keyboard: Space plays/stops when focus is outside an interactive control; Ctrl/Command Z undoes; Shift Ctrl/Command Z redoes; Ctrl/Command S downloads a project backup; Escape stops playback. Dialogs, sliders and recording controls support keyboard interaction. Slider thumbs have explicit accessible names and spoken values; mixer and song-setting gestures each commit one undoable musical change. Seeking controls playback, and studio interpretation controls the next render.
+
+## Tuning Center
+
+Open `/tuning` (also linked in the composer footer) for 15 guided melodies, explained Hmm/Daa/Baa styles, microphone-distance tracking, reference playback, recording and rerecording, local session saves, and clean/noisy detector comparisons. Export your recordings for reproducible evaluation with `npm run voices:lab`. See [TUNING_CENTER.md](./TUNING_CENTER.md) for the recording protocol and scoring workflow.
 
 ## Architecture
 

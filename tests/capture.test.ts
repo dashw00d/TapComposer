@@ -84,7 +84,7 @@ void test('capture worklet honors the song clock, flushes on stop, and stops at 
   assert.ok(Math.abs(pcm[384] - 0.6) < 0.00001);
 });
 
-void test('counted microphone ideas keep the same first-note offset as their source audio', async () => {
+void test('standalone ideas trim empty edges while backed takes preserve the recording clock', async () => {
   const { alignCapturedIntent } = await import('../lib/music/capture');
   const { buildIntent } = await import('../lib/music/analyze');
   for (const source of ['hum', 'microphone-taps'] as const) {
@@ -103,8 +103,9 @@ void test('counted microphone ideas keep the same first-note offset as their sou
     );
     for (const hasBacking of [false, true]) {
       const aligned = alignCapturedIntent(intent, hasBacking);
-      assert.equal(aligned.events[0].time, 1.2);
-      assert.equal(aligned.duration, 3);
+      assert.equal(aligned.events[0].time, hasBacking ? 1.2 : 0);
+      assert.ok(Math.abs(aligned.duration - (hasBacking ? 3 : 0.4)) < 1e-8);
+      assert.equal(intent.events[0].time, 1.2);
     }
   }
   const taps = buildIntent(

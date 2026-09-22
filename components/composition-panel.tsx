@@ -395,7 +395,7 @@ export function CompositionPanel({
                     </button>
                     <button
                       aria-label={`Shorten ${section.name}`}
-                      disabled={section.bars <= 2}
+                      disabled={section.bars <= 1}
                       onClick={() =>
                         update((s) =>
                           resizeSection(s, section.id, section.bars - 2),

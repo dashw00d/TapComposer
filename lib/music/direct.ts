@@ -194,11 +194,7 @@ export function resizeSection(song: Song, id: string, bars: number): Song {
   const others = (song.sections ?? [])
     .filter((s) => s.id !== id)
     .reduce((n, s) => n + s.bars, 0);
-  const bounded = clamp(
-    Math.round(bars / 2) * 2,
-    2,
-    Math.min(32, 128 - others),
-  );
+  const bounded = clamp(Math.round(bars), 1, Math.min(32, 128 - others));
   return {
     ...song,
     sections: song.sections?.map((s) =>

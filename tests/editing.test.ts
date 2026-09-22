@@ -12,6 +12,7 @@ import {
   editNoteGeometry,
   editNote,
   trimQuietEdges,
+  fitLoopToNotes,
 } from '../lib/music/cleanup';
 import {
   arrangedTracks,
@@ -165,6 +166,41 @@ void test('individual note edits preserve source audio, survive changing sound a
   assert.ok(bounded.events[0].time + bounded.events[0].duration <= 120);
   assert.equal(bounded.events[0].note, 0);
   assert.equal(bounded.duration, 120);
+});
+
+void test('fitting a sparse recording removes edge silence and repeats on a complete bar', async () => {
+  const song = makeDemoSong();
+  const source = {
+    ...song.tracks[0],
+    sourceTempo: 120,
+    duration: 30,
+    events: [
+      { time: 11, duration: 0.3, note: 60, velocity: 0.7 },
+      { time: 11.5, duration: 0.4, note: 62, velocity: 0.7 },
+    ],
+  };
+  const fitted = fitLoopToNotes(source, 90);
+  assert.equal(
+    fitted.duration,
+    2,
+    'use the recording tempo rather than the current playback speed',
+  );
+  assert.deepEqual(
+    fitted.events.map((e) => e.time),
+    [0, 0.5],
+  );
+  assert.equal(fitted.intent, source.intent);
+  assert.equal(fitted.original, source.original);
+  assert.equal(source.duration, 30);
+  assert.deepEqual(
+    changeInstrument(fitted, 'strings', song.context!).events,
+    fitted.events,
+  );
+  const restored = await importProject(
+    await exportProject({ ...song, tracks: [fitted, ...song.tracks.slice(1)] }),
+  );
+  assert.deepEqual(restored.tracks[0].events, fitted.events);
+  assert.equal(restored.tracks[0].duration, 2);
 });
 
 void test('magnetic note edits land on the grid and musical keys without rewriting captured pitches', async () => {

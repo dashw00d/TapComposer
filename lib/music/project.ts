@@ -95,6 +95,9 @@ export async function importProject(file: Blob): Promise<Song> {
       raw.events.length > 10000 ||
       (raw.sourceTempo !== undefined && !number(raw.sourceTempo, 40, 240)) ||
       !object(raw.intent) ||
+      (raw.intent.vocalStyle !== undefined &&
+        (typeof raw.intent.vocalStyle !== 'string' ||
+          !['hmm', 'daa', 'baa'].includes(raw.intent.vocalStyle))) ||
       !Array.isArray(raw.intent.events) ||
       raw.intent.events.length > 10000 ||
       !['hum', 'touch', 'microphone-taps'].includes(
@@ -134,6 +137,8 @@ export async function importProject(file: Blob): Promise<Song> {
         !number(event.duration, 0, 120) ||
         (event.pitch !== null && !number(event.pitch, 0, 127)) ||
         !number(event.confidence, 0, 1) ||
+        (event.pitchDrift !== undefined &&
+          typeof event.pitchDrift !== 'boolean') ||
         !number(event.intensity, 0, 1)
       )
         throw new Error('This project contains invalid source events.');
@@ -192,7 +197,7 @@ export async function importProject(file: Blob): Promise<Song> {
       !object(section) ||
       typeof section.id !== 'string' ||
       typeof section.name !== 'string' ||
-      !number(section.bars, 2, 32) ||
+      !number(section.bars, 1, 32) ||
       !number(section.energy, 0, 1) ||
       !Array.isArray(section.trackIds) ||
       !section.trackIds.every((id) => tracks.some((t) => t.id === id))

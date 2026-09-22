@@ -118,7 +118,11 @@ void test('a hum becomes a structured song with backing while source melody and 
     song = composeSong(input);
   assert.equal(song.tracks[0], input.tracks[0]);
   assert.equal(song.sections?.length, 5);
-  assert.equal(sectionLength(song), 112);
+  assert.equal(
+    sectionLength(song),
+    44,
+    'short ideas no longer expand to 28 bars',
+  );
   assert.ok(song.tracks.some((t) => t.instrument === 'bass' && t.generated));
   assert.ok(song.tracks.some((t) => t.instrument === 'drums' && t.generated));
   assert.ok(
@@ -300,6 +304,17 @@ void test('undo and redo restore full arrangements and original audio by referen
   assert.equal(state.present, second);
   assert.equal(state.present!.tracks[0].original, first.tracks[0].original);
 });
+void test('short backing loops keep their length when the song is recomposed', () => {
+  const initial = composeSong(idea());
+  const changed = composeSong(initial, { variation: 1 });
+  for (const track of initial.tracks.filter((t) => t.generated)) {
+    assert.equal(
+      changed.tracks.find((t) => t.id === track.id)!.duration,
+      track.duration,
+    );
+  }
+});
+
 void test('automatic main sections keep a long recorded phrase in full', () => {
   const song = idea();
   song.tracks[0].duration = 24;
@@ -342,4 +357,28 @@ void test('per-section entrances, one-time play, and register changes affect onl
   assert.ok(rendered.events[0].time >= (4 * 60) / song.context!.tempo);
   assert.equal(rendered.events[0].note, original.events[0].note + 12);
   assert.equal(original.events[0].note, 60);
+});
+
+void test('rerecording replaces only the chosen performance, retains its mix and placement, and undoes in one step', async () => {
+  const { songClips } = await import('../lib/music/clips');
+  for (const targetIndex of [0, 1]) {
+    const song = composeSong(idea());
+    song.clips = songClips(song);
+    const previous = song.tracks[targetIndex];
+    Object.assign(previous, { name: 'My favorite part', volume: 0.45, pan: -0.3, muted: true, solo: true, pinned: true });
+    const replacement = { ...idea(previous.instrument).tracks[0], id: previous.id, original: new Blob(['new take']), events: [{ time: 0, duration: 0.5, note: 72, velocity: 0.8 }] };
+    const next = keepIdea(song, replacement, { ...song.context!, key: 7 });
+    assert.equal(next.tracks.length, song.tracks.length);
+    const kept = next.tracks[targetIndex];
+    assert.equal(kept.original, replacement.original);
+    assert.deepEqual(kept.events, replacement.events);
+    for (const key of ['name', 'volume', 'pan', 'muted', 'solo', 'pinned'] as const) assert.equal(kept[key], previous[key]);
+    assert.equal(kept.generated, false);
+    assert.equal(next.context, song.context);
+    assert.equal(next.sections, song.sections);
+    assert.equal(next.clips, song.clips);
+    song.tracks.forEach((track, index) => { if (index !== targetIndex) assert.equal(next.tracks[index], track); });
+    const edited = songHistoryReducer({ present: song, past: [], future: [] }, { type: 'edit', song: next });
+    assert.equal(songHistoryReducer(edited, { type: 'undo' }).present, song);
+  }
 });

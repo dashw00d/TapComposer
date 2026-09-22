@@ -1,5 +1,15 @@
 # Real voice evaluation
 
+## Forgiving phrase interpretation — September 9, 2026
+
+New hummed takes default to reversible musical cleanup. It merges adjacent ≤140 ms settling fragments within two semitones when a neighbor is at least 2.2 times longer, including confidently detected but unintended pitches. Breaths and equally short repeated syllables remain distinct. Weak octave fragments are eligible only below 0.7 confidence. Notes use one phrase-wide eighth/sixteenth/triplet grid, whole grid-unit lengths, and normalized velocity. Original detection remains available in the recorder; raw audio is unchanged. This deliberately edits the performance and is not a new acoustic recognition accuracy claim.
+
+On the existing 40-clip `gpu-cleanup-final` corpus, original note F1 remains 73.34% at 100 ms / 66.38% at 50 ms. Musical cleanup scores 67.84% / 42.35% against the unquantized sung annotations (`cleanup-forgiving-sept9`). The loss of literal timing fidelity is disclosed rather than called a detector improvement. Actual perceived quality for casual humming still needs user listening. Maximum phrase-end extension observed in this regression was 193 ms, with no extra detected notes.
+
+Standalone capture trims detected leading/trailing silence; capture over backing retains its clock. New song sections scale with phrase length, and existing arrangements remain unchanged. Loop lengths are visible, and Fit loop to notes trims existing parts non-destructively. Long held notes no longer truncate at eight seconds.
+
+## Previous recognition work
+
 Premium recognition now uses a GPU model ensemble and a new note decoder; Free keeps the browser model. This improves measured pitch and note timing on the real vocal bank, but does not establish reliable recognition for every casual hum. No model training or fine-tuning was performed.
 
 ## Quiet-input and cleanup update

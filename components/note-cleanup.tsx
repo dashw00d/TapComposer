@@ -9,7 +9,7 @@ import {
   magneticTime,
   noteName,
   stepTime,
-  trimQuietEdges,
+  fitLoopToNotes,
 } from '@/lib/music/cleanup';
 
 export function NoteCleanup({
@@ -65,7 +65,8 @@ export function NoteCleanup({
     px = 72,
     row = drums ? 40 : 18,
     keys = 54;
-  const bars = 4,
+  const loopBars = Math.max(1, Math.ceil(track.duration / (4 * beat) - 1e-8));
+  const bars = Math.min(4, loopBars),
     span = bars * 4 * beat;
   const pageStart =
     Math.min(page, Math.max(0, Math.ceil(track.duration / span) - 1)) * span;
@@ -171,6 +172,10 @@ export function NoteCleanup({
           : 'Drag up or down to change the note. Drag sideways for timing. Pull the right edge to make it longer.'}
       </p>
       <div className="note-guidance">
+        <span>
+          Loop: {loopBars} {loopBars === 1 ? 'bar' : 'bars'} ·{' '}
+          {((loopBars * 4 * 60) / (tempo ?? 100)).toFixed(1)} seconds
+        </span>
         <span>Magnetic timing · ¼ beat</span>
         {!drums && context && (
           <span>
@@ -464,9 +469,12 @@ export function NoteCleanup({
           className="text-button"
           disabled={!track.events.length}
           title="Shifts the whole pattern to its first note; your recording stays unchanged"
-          onClick={() => onChange(trimQuietEdges(track))}
+          onClick={() => {
+            onChange(fitLoopToNotes(track, tempo));
+            setPage(0);
+          }}
         >
-          Trim empty edges
+          Fit loop to notes
         </button>
       </div>
     </section>

@@ -46,5 +46,22 @@ export function makeDemoSong(song: Song = newSong()): Song {
     muted: false,
     smoother: false,
   };
-  return composeSong({ ...song, context, tracks: [piano, drums] });
+  const composed = composeSong({ ...song, context, tracks: [piano, drums] });
+  // The bundled Studio Take was rendered from this specific 28-bar example.
+  // Keep that source arrangement stable as new user songs get shorter defaults.
+  return composeSong({
+    ...composed,
+    tracks: composed.tracks.map((track) =>
+      track.generated
+        ? {
+            ...track,
+            duration: (16 * 60) / context.tempo,
+          }
+        : track,
+    ),
+    sections: composed.sections!.map((section, i) => ({
+      ...section,
+      bars: [4, 8, 4, 8, 4][i],
+    })),
+  });
 }

@@ -24,6 +24,25 @@ const intent: MusicalIntent = {
   ],
 };
 
+void test('explicit Hmm uses the tuned local path even when the server is enabled', async () => {
+  let local = 0;
+  const client = new PremiumAnalysis(
+    () => {
+      local++;
+      return { result: Promise.resolve(intent), cancel() {} };
+    },
+    async () => {
+      throw new Error('Hmm must not request server recognition');
+    },
+    () => true,
+  );
+  assert.equal(
+    await client.analyze(pcm, 16000, 'hum', undefined, 'hmm').result,
+    intent,
+  );
+  assert.equal(local, 1);
+});
+
 void test('free and unavailable recognition never POST audio; taps stay local', async () => {
   for (const access of [
     { premium: false, transcriptionReady: true },

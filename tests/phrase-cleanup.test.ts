@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { cleanHumIntent } from '../lib/music/phrase-cleanup';
+import { cleanHumIntent, stabilizeHum } from '../lib/music/phrase-cleanup';
 import { resolveIntent, smoothTrack } from '../lib/music/resolve';
 import { changeInstrument } from '../lib/music/composition';
 import { noteEnvelope } from '../lib/music/articulation';
@@ -47,25 +47,26 @@ void test('cleanup absorbs weak wobbles and octave blips inside one sustained no
     assert.equal(cleaned.events.length, 1);
     assert.equal(cleaned.events[0].pitch, 60);
     assert.equal(cleaned.events[0].time, 0.2);
-    assert.ok(Math.abs(cleaned.events[0].duration - 1.07) < 1e-8);
+    assert.ok(Math.abs(stabilizeHum(source).events[0].duration - 1.07) < 1e-8);
+    assert.equal(cleaned.events[0].duration, 1);
     assert.deepEqual(source, before);
   }
 });
-void test('cleanup preserves deliberate short chromatic notes, breaths and repeated syllables', () => {
+void test('stabilization preserves breaths and repeated syllables before fitting rhythm', () => {
   for (const events of [
-    [note(0.2, 0.3), note(0.5, 0.07, 61), note(0.57, 0.3)],
+    [note(0.2, 0.12), note(0.32, 0.12, 61), note(0.44, 0.12)],
     [note(0.2, 0.25), note(0.6, 0.25), note(1, 0.25)],
     [note(0.2, 0.5), note(0.8, 0.07, 61, 0.5, 0.3), note(1, 0.5)],
   ]) {
     const source = intent(events),
-      cleaned = cleanHumIntent(source, context);
+      cleaned = stabilizeHum(source);
     assert.deepEqual(
       cleaned.events.map((e) => [e.time, e.duration, e.pitch]),
       source.events.map((e) => [e.time, e.duration, e.pitch]),
     );
   }
 });
-void test('cleanup follows established pulse gently, retains count-in and ignores irregular rhythm', () => {
+void test('cleanup fits loose rhythm and durations to a consistent grid while retaining the first onset', () => {
   const source = intent(
     [0.137, 0.648, 1.13, 1.649, 2.132, 2.64].map((t) => note(t, 0.25)),
   );
@@ -80,17 +81,37 @@ void test('cleanup follows established pulse gently, retains count-in and ignore
   const loose = intent(
     [0.17, 0.581, 1.101, 1.402, 2.236, 2.813].map((t) => note(t, 0.15)),
   );
-  assert.deepEqual(
-    cleanHumIntent(loose, context).events.map((e) => e.time),
-    loose.events.map((e) => e.time),
-  );
+  const regular = cleanHumIntent(loose, context);
+  for (const e of regular.events) {
+    assert.ok(
+      Math.abs((e.time - 0.17) / 0.25 - Math.round((e.time - 0.17) / 0.25)) <
+        1e-8,
+    );
+    assert.ok(
+      Math.abs(e.duration / 0.25 - Math.round(e.duration / 0.25)) < 1e-8,
+    );
+  }
   const triplets = intent(
     [0, 1, 2, 3, 4, 5].map((i) => note(0.2 + i / 6, 0.12)),
   );
-  assert.deepEqual(
-    cleanHumIntent(triplets, context).events.map((e) => e.time),
-    triplets.events.map((e) => e.time),
+  cleanHumIntent(triplets, context).events.forEach((e, i) =>
+    assert.ok(Math.abs(e.time - triplets.events[i].time) < 1e-8),
   );
+});
+void test('short settling notes merge toward the sustained pitch even with high detector confidence', () => {
+  for (const pitch of [60, 61, 62]) {
+    for (const events of [
+      [note(0, 0.07, pitch), note(0.07, 0.6, 60)],
+      [note(0, 0.6, 60), note(0.6, 0.07, pitch)],
+    ]) {
+      const clean = cleanHumIntent(intent(events), context);
+      assert.equal(clean.events.length, 1);
+      assert.equal(clean.events[0].pitch, 60);
+      assert.ok(clean.events[0].duration >= 0.5);
+    }
+  }
+  const leap = intent([note(0, 0.08, 67), note(0.08, 0.6, 60)]);
+  assert.equal(stabilizeHum(leap).events.length, 2);
 });
 void test('cleanup evens loudness without reversing accents and is exactly reversible across instruments', () => {
   const source = intent([
@@ -115,6 +136,34 @@ void test('cleanup evens loudness without reversing accents and is exactly rever
     resolveIntent(source, 'strings', context, false, true).events,
   );
 });
+void test('held hums are not cut off at eight seconds and polyphonic manual notes are untouched', () => {
+  const held = intent([note(0, 14.1)]);
+  const resolved = resolveIntent(held, 'strings', context, true, true);
+  assert.equal(resolved.events[0].duration, 14);
+  const chord = intent([note(0, 1), note(0, 1, 64), note(0, 1, 67)]);
+  assert.equal(cleanHumIntent(chord, context), chord);
+});
+
+void test('phrase cleanup joins tiny holes but keeps audible rests and repeated attacks', () => {
+  const source = intent([
+    note(0.2, 0.46),
+    note(0.71, 0.34),
+    note(1.21, 0.26, 64),
+    note(2.22, 0.4, 67),
+  ]);
+  const original = structuredClone(source);
+  const clean = cleanHumIntent(source, context);
+  assert.equal(clean.events.length, 4);
+  const gaps = clean.events
+    .slice(1)
+    .map((e, i) => e.time - clean.events[i].time - clean.events[i].duration);
+  assert.ok(Math.abs(gaps[0]) < 1e-8, 'tiny break joins at next attack');
+  assert.ok(Math.abs(gaps[1] - 0.25) < 1e-8, 'breath becomes an eighth rest');
+  assert.ok(Math.abs(gaps[2] - 0.75) < 1e-8, 'longer pause retains its space');
+  assert.equal(clean.events[0].time, source.events[0].time);
+  assert.deepEqual(source, original);
+});
+
 void test('cleaned phrases shorten release tails without cutting intentional overlaps', () => {
   const t = {
     ...track(intent([note(0, 0.4), note(0.4, 0.4, 64)]), 'strings'),

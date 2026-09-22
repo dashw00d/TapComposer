@@ -1,4 +1,6 @@
 import type { IntentEvent, MusicalIntent, InputSource } from './types';
+import { annotateHumDrift, splitHumAttacks } from './hum-articulation';
+import { voiceActivity } from './voice-activity';
 
 const clamp = (n: number, min: number, max: number) =>
   Math.max(min, Math.min(max, n));
@@ -105,6 +107,7 @@ export function humFramesToIntent(
   hopSeconds: number,
   duration: number,
 ): MusicalIntent {
+  const activity = voiceActivity(frames.map((f) => f.rms));
   // A deep local energy valley is a syllable boundary even when the tracker
   // can still hear the preceding pitch. Relative levels also work for quiet voices.
   const gated = frames.map((f, i) => {
@@ -112,7 +115,10 @@ export function humFramesToIntent(
     const level = median(nearby.map((x) => x.rms));
     return {
       ...f,
-      pitch: f.rms < Math.max(0.001, level * 0.22) ? NaN : f.pitch,
+      pitch:
+        !activity[i] || f.rms < Math.max(0.001, level * 0.22) ? NaN : f.pitch,
+      // A known room-level interval must not be bridged as a tracker dropout.
+      confidence: activity[i] ? f.confidence : 0,
     };
   });
   const smoothed = gated.map((f, i) => {
@@ -221,7 +227,15 @@ export function humFramesToIntent(
   }
   if (pending.length) absorb();
   flush();
-  return buildIntent('hum', events, duration);
+  return buildIntent(
+    'hum',
+    annotateHumDrift(
+      splitHumAttacks(events, gated, hopSeconds),
+      gated,
+      hopSeconds,
+    ),
+    duration,
+  );
 }
 
 export function analyzeTaps(

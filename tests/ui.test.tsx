@@ -563,6 +563,7 @@ void test('playlist gestures move and resize audible blocks, while piano-roll ed
   let song = original;
   const past: Song[] = [];
   const auditions: { note: number; time: number }[] = [];
+  let rerecordId: string | null = null;
   Object.defineProperty(window, 'PointerEvent', {
     configurable: true,
     value: window.MouseEvent,
@@ -592,6 +593,7 @@ void test('playlist gestures move and resize audible blocks, while piano-roll ed
       position={0}
       onSeek={() => {}}
       onMore={() => {}}
+      onRerecord={(track) => { rerecordId = track.id; }}
       onUndo={() => {
         song = past.pop()!;
         view.rerender(ui());
@@ -601,8 +603,10 @@ void test('playlist gestures move and resize audible blocks, while piano-roll ed
   );
   const view = render(ui());
   try {
+    fireEvent.click(screen.getByRole('button', { name: 'Record My melody again' }));
+    assert.equal(rerecordId, song.tracks[0].id);
     const clip = screen.getByRole('button', {
-      name: 'My melody, bar 1, 4 bars',
+      name: 'My melody, bar 1, 1 bars',
     });
     clip.getBoundingClientRect = () => ({
       left: 0,
@@ -625,12 +629,12 @@ void test('playlist gestures move and resize audible blocks, while piano-roll ed
       (4 * 60) / song.context!.tempo,
     );
     const moved = screen.getByRole('button', {
-      name: 'My melody, bar 2, 4 bars',
+      name: 'My melody, bar 2, 1 bars',
     });
     fireEvent.pointerDown(moved, { button: 0, clientX: 186, clientY: 20 });
-    fireEvent.pointerMove(moved, { clientX: 138, clientY: 20 });
-    fireEvent.pointerUp(moved, { clientX: 138, clientY: 20 });
-    assert.equal(songClips(song)[0].lengthBeats, 12);
+    fireEvent.pointerMove(moved, { clientX: 234, clientY: 20 });
+    fireEvent.pointerUp(moved, { clientX: 234, clientY: 20 });
+    assert.equal(songClips(song)[0].lengthBeats, 8);
     const note = screen.getByRole('button', { name: /^Note 1,/ });
     note.getBoundingClientRect = () => ({
       left: 0,
@@ -818,8 +822,8 @@ void test('cleanup auditions both versions and restores the saved source notes',
   AudioEngine.prototype.play=async tracks=>{auditions.push(tracks);return {startAt:0,duration:4};};
   try {
     render(<Composer/>);
-    await waitFor(()=>assert.ok(screen.getByRole('button',{name:'My melody, bar 1, 4 bars'})));
-    fireEvent.click(screen.getByRole('button',{name:'My melody, bar 1, 4 bars'}));
+    await waitFor(()=>assert.ok(screen.getByRole('button',{name:'My melody, bar 1, 1 bars'})));
+    fireEvent.click(screen.getByRole('button',{name:'My melody, bar 1, 1 bars'}));
     fireEvent.click(screen.getByRole('button',{name:'More options'}));
     fireEvent.click(screen.getByRole('button',{name:'Clean up this part'}));
     await waitFor(()=>assert.equal(auditions.length,1));
@@ -831,4 +835,237 @@ void test('cleanup auditions both versions and restores the saved source notes',
     assert.deepEqual(auditions[1][0].events,song.tracks[0].events);
     await waitFor(async()=>assert.equal((await listSongs()).find(s=>s.id===song.id)!.tracks[0].smoother,false));
   } finally {cleanup();AudioEngine.prototype.play=oldPlay;localStorage.clear();}
+});
+
+void test('the example plays before its studio download, and live feel changes can be undone', async () => {
+  const { IDBFactory } = await import('fake-indexeddb');
+  Object.defineProperty(globalThis, 'indexedDB', { value: new IDBFactory(), configurable: true });
+  const { listSongs } = await import('../lib/music/storage');
+  const aliases = registerHooks({ resolve(specifier, context, next) {
+    return next(specifier === 'next/link' ? 'vinext/shims/link' : specifier, context);
+  } });
+  const { default: Composer } = await import('../components/composer');
+  aliases.deregister();
+  localStorage.clear();
+  const oldFetch = globalThis.fetch;
+  // oxlint-disable-next-line typescript/unbound-method
+  const oldPlay = AudioEngine.prototype.play;
+  const plays: Track[][] = [];
+  AudioEngine.prototype.play = async (tracks) => {
+    plays.push(tracks);
+    return { startAt: 0, duration: 60 };
+  };
+  let finishDownload!: (response: Response) => void;
+  globalThis.fetch = async (input) => (typeof input === 'string' ? input : input instanceof URL ? input.href : input.url).includes('/demo/')
+    ? new Promise<Response>((resolve) => { finishDownload = resolve; })
+    : new Response(JSON.stringify({ premium: false, ready: false }), { headers: { 'Content-Type': 'application/json' } });
+  try {
+    render(<Composer />);
+    await waitFor(() => assert.ok(!screen.getByRole('button', { name: /Take it for a spin/ }).hasAttribute('disabled')));
+    assert.equal(screen.queryByRole('button', { name: 'Play my song' }), null, 'A new visitor sees starting choices, not disabled studio controls');
+    fireEvent.click(screen.getByRole('button', { name: /Take it for a spin/ }));
+    await waitFor(() => assert.equal(plays.length, 1));
+    assert.ok(plays[0].some((track) => track.events.length > 0));
+    await waitFor(() => assert.ok(screen.getByRole('button', { name: 'Stop playing' })));
+    fireEvent.click(screen.getByRole('button', { name: 'Daydream' }));
+    await waitFor(() => assert.equal(plays.length, 2));
+    await waitFor(async () => assert.equal((await listSongs())[0].compose?.feel, 'dreamy'));
+    finishDownload(new Response(new Blob(['audio'], { type: 'audio/wav' }), { headers: { 'Content-Type': 'audio/wav' } }));
+    await waitFor(async () => assert.equal((await listSongs())[0].premiumTakes?.length, 1));
+    assert.ok(screen.getByRole('button', { name: 'Stop playing' }), 'The studio download must not interrupt playback');
+    assert.equal(plays.length, 2);
+    fireEvent.click(screen.getByRole('button', { name: 'Show off' }));
+    await waitFor(() => assert.ok(screen.getByRole('dialog')));
+    assert.equal(plays.length, 2, 'Opening the listening view preserves playback');
+    fireEvent.click(screen.getByRole('button', { name: 'Back to making music' }));
+    await waitFor(() => assert.equal(screen.queryByRole('dialog'), null));
+    // The downloaded take is an undoable edit; then the feel is the preceding edit.
+    fireEvent.click(screen.getByRole('button', { name: 'Undo' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Undo' }));
+    await waitFor(async () => assert.equal((await listSongs())[0].compose?.feel, 'easy'));
+  } finally {
+    cleanup();
+    globalThis.fetch = oldFetch;
+    AudioEngine.prototype.play = oldPlay;
+    localStorage.clear();
+  }
+});
+
+void test('the listening view follows audible notes and seeks to musical sections', async () => {
+  const { SongSpotlight } = await import('../components/song-spotlight');
+  const { arrangedTracks } = await import('../lib/music/composition');
+  const { songDuration } = await import('../lib/music/resolve');
+  const song = sample();
+  const tracks = arrangedTracks(song);
+  let seek = -1;
+  let played = false;
+  let saved = false;
+  const props = {
+    song, tracks, open: true, onOpenChange: () => {}, playing: true, loading: false,
+    position: tracks[0].events[0].time + 0.01, duration: songDuration(tracks),
+    onPlay: () => { played = true; }, onSeek: (seconds: number) => { seek = seconds; },
+    onSave: () => { saved = true; }, error: '',
+  };
+  try {
+    const view = render(<SongSpotlight {...props} />);
+    assert.ok(document.querySelector('.spotlight-band .is-sounding'), 'An audible note lights its instrument');
+    const section = song.sections![1];
+    fireEvent.click(screen.getByRole('button', { name: section.name }));
+    assert.equal(seek, song.sections![0].bars * 4 * 60 / song.context!.tempo);
+    fireEvent.click(screen.getByRole('button', { name: 'Stop playing' }));
+    assert.equal(played, true);
+    fireEvent.click(screen.getByRole('button', { name: 'Save audio' }));
+    assert.equal(saved, true);
+    view.rerender(<SongSpotlight {...props} playing={false} />);
+    assert.equal(document.querySelector('.spotlight-band .is-sounding'), null);
+    assert.ok(screen.getByRole('button', { name: 'Play my song' }));
+  } finally { cleanup(); }
+});
+
+void test('a track retake opens in its previous input mode and leaves the old take intact until kept', async () => {
+  const { keepIdea } = await import('../lib/music/composition');
+  const song = sample();
+  const original = song.tracks[0];
+  original.intent = { ...original.intent, source: 'touch' };
+  const engine = new AudioEngine();
+  engine.ready = async () => ({}) as AudioContext;
+  engine.tap = async () => {};
+  engine.stop = () => {};
+  engine.play = async () => ({ startAt: 0, duration: 4 });
+  engine.load = async () => {};
+  let kept: Song = song;
+  let closed = false;
+  const now = performance.now.bind(performance);
+  let clock = 10000;
+  Object.defineProperty(performance, 'now', { value: () => clock, configurable: true });
+  try {
+    render(<Recorder instrument={original.instrument} replaceId={original.id} song={song} engine={engine}
+      onClose={() => { closed = true; }} onKeep={(track, context) => { kept = keepIdea(song, track, context); }} />);
+    assert.ok(screen.getByRole('heading', { name: 'Record My melody again.' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Tap rhythm pad' }));
+    await waitFor(() => assert.ok(screen.getByText('1 tap')));
+    for (let i = 0; i < 3; i++) {
+      clock += 500;
+      fireEvent.click(screen.getByRole('button', { name: 'Tap rhythm pad' }));
+    }
+    clock += 500;
+    fireEvent.click(screen.getByRole('button', { name: 'Hear my idea' }));
+    await waitFor(() => assert.ok(screen.getByRole('button', { name: 'Keep new take' })));
+    assert.equal(kept, song, 'Auditioning must not replace the saved track');
+    fireEvent.click(screen.getByRole('button', { name: 'Keep current take' }));
+    assert.equal(closed, true);
+    assert.equal(kept, song);
+    fireEvent.click(screen.getByRole('button', { name: 'Keep new take' }));
+    assert.equal(kept.tracks[0].id, original.id);
+    assert.equal(kept.tracks[0].name, original.name);
+    assert.notDeepEqual(kept.tracks[0].events, original.events);
+    assert.equal(kept.tracks.length, song.tracks.length);
+    song.tracks.slice(1).forEach((track, index) => assert.equal(kept.tracks[index + 1], track));
+  } finally {
+    Object.defineProperty(performance, 'now', { value: now, configurable: true });
+    cleanup();
+  }
+});
+
+void test('Tuning Center synchronizes the guide, preserves drafts during rehearsal, and keeps rerecordings and saved progress', async () => {
+  const { IDBFactory } = await import('fake-indexeddb');
+  Object.defineProperty(globalThis, 'indexedDB', { value: new IDBFactory(), configurable: true });
+  const { latestLab } = await import('../lib/voice-lab/storage');
+  const { MELODIES, melodyScore } = await import('../lib/voice-lab/protocol');
+  const aliases = registerHooks({ resolve(specifier, context, next) { return next(specifier === 'next/link' ? 'vinext/shims/link' : specifier, context); } });
+  const { default: TuningCenter } = await import('../components/voice-lab/tuning-center');
+  const { AnalysisClient } = await import('../lib/music/analysis-client');
+  const oldAnalyze = Object.getOwnPropertyDescriptor(AnalysisClient.prototype, 'analyze')!;
+  AnalysisClient.prototype.analyze = () => ({result: Promise.resolve({version:1,source:'hum',duration:6,confidence:.9,events:[{time:1,duration:.2,pitch:59.2,confidence:.9,intensity:.7},{time:1.2,duration:1,pitch:60,confidence:.9,intensity:.7,pitchDrift:true}]}),cancel() {}});
+  aliases.deregister();
+  const oldMedia = Object.getOwnPropertyDescriptor(navigator, 'mediaDevices');
+  const oldWorklet = globalThis.AudioWorkletNode;
+  const oldMethods = Object.getOwnPropertyDescriptors(AudioEngine.prototype);
+  const oldPause = Object.getOwnPropertyDescriptor(dom.window.HTMLMediaElement.prototype, 'pause');
+  Object.defineProperty(dom.window.HTMLMediaElement.prototype, 'pause', { value: () => {}, configurable: true });
+  let released = 0;
+  Object.defineProperty(navigator, 'mediaDevices', { configurable: true, value: { getUserMedia: async () => ({ getTracks: () => [{ stop: () => { released++; } }] }) } });
+  const clock = { currentTime: 10, sampleRate: 16000, destination: {}, decodeAudioData: async () => ({sampleRate:16000,getChannelData:()=>new Float32Array(96000)}), createMediaStreamSource: () => ({connect() {}, disconnect() {}}) };
+  const nodes: FakeLabWorklet[] = [];
+  class FakeLabWorklet {
+    startAt: number;
+    commands: string[] = [];
+    port = { onmessage: null as ((event: {data:{type:string;pcm:Float32Array}}) => void) | null, postMessage: (command: string) => {
+      this.commands.push(command);
+      if (command === 'stop') this.port.onmessage?.({data:{type:'complete',pcm:Float32Array.from({length: Math.round(melodyScore(MELODIES[0],48,90).duration * clock.sampleRate)}, (_,i) => .1*Math.sin(i*.1))}});
+    }, close() {} };
+    constructor(_context: unknown, _name: string, options: {processorOptions:{startAt:number}}) { this.startAt = options.processorOptions.startAt; nodes.push(this); }
+    connect() {}
+    disconnect() {}
+  }
+  globalThis.AudioWorkletNode = FakeLabWorklet as unknown as typeof AudioWorkletNode;
+  const scheduled: (number | undefined)[] = [];
+  const previews: Track[][] = [];
+  const overrides = {
+    prepareCapture: { value: async () => clock },
+    ready: { value: async () => clock },
+    stop: { value: () => {} },
+    close: { value: async () => {} },
+    currentTime: { get: () => clock.currentTime },
+    play: { value: async (_tracks: Track[], _repeat: boolean, _end: () => void, startAt?: number) => { previews.push(_tracks); scheduled.push(startAt); return {startAt:startAt ?? clock.currentTime,duration:6}; } },
+  };
+  for (const [key, descriptor] of Object.entries(overrides)) Object.defineProperty(AudioEngine.prototype, key, {...descriptor,configurable:true});
+  try {
+    const view = render(<TuningCenter />);
+    await waitFor(() => assert.ok(!screen.getByRole('button',{name:'Record my take'}).hasAttribute('disabled')));
+    assert.equal(screen.getByRole('complementary',{name:'Choose a melody'}).querySelectorAll('button').length,15);
+    fireEvent.click(screen.getByRole('button',{name:'Daa'}));
+    assert.ok(screen.getByText(/Start every note with a soft D/));
+    fireEvent.click(screen.getByRole('button',{name:'Record my take'}));
+    await waitFor(() => assert.equal(nodes.length,1));
+    assert.equal(scheduled[0],nodes[0].startAt);
+    fireEvent.click(screen.getByRole('button',{name:'Cancel take'}));
+    assert.equal(released,1);
+    assert.equal(await latestLab(),null);
+    fireEvent.click(screen.getByRole('button',{name:'Record my take'}));
+    await waitFor(() => assert.equal(nodes.length,2));
+    clock.currentTime = nodes[1].startAt + melodyScore(MELODIES[0],48,90).duration + .02;
+    await waitFor(() => assert.ok(screen.getByRole('button',{name:'Keep this take'})));
+    assert.equal(await latestLab(),null,'Review does not save a draft');
+    fireEvent.click(screen.getByRole('button',{name:'Hear the melody'}));
+    await waitFor(() => assert.ok(screen.getByRole('button',{name:'Stop reference'})));
+    fireEvent.click(screen.getByRole('button',{name:'Stop reference'}));
+    assert.ok(screen.getByRole('button',{name:'Keep this take'}),'Rehearsal must not discard a draft');
+    fireEvent.click(screen.getByRole('button',{name:'Run detector'}));
+    await waitFor(() => assert.ok(screen.getByRole('button',{name:'Hear cleaned phrase'})));
+    fireEvent.click(screen.getByRole('button',{name:'Hear detected melody'}));
+    await waitFor(() => assert.equal(previews.at(-1)![0].events.length,2));
+    fireEvent.click(screen.getByRole('button',{name:'Hear cleaned phrase'}));
+    await waitFor(() => assert.equal(previews.at(-1)![0].events.length,1));
+    assert.ok(screen.getByRole('button',{name:'Stop cleaned phrase'}));
+    fireEvent.click(screen.getByRole('button',{name:'Stop cleaned phrase'}));
+    fireEvent.click(screen.getByRole('button',{name:'Keep this take'}));
+    await waitFor(async () => assert.equal((await latestLab())?.takes.length,1));
+    await waitFor(() => assert.ok(screen.getByRole('button',{name:'Rerecord this exercise'})));
+    fireEvent.click(screen.getByRole('button',{name:'Rerecord this exercise'}));
+    await waitFor(() => assert.equal(nodes.length,3));
+    clock.currentTime = nodes[2].startAt + melodyScore(MELODIES[0],48,90).duration + .02;
+    await waitFor(() => assert.ok(screen.getByRole('button',{name:'Keep & next melody'})));
+    fireEvent.click(screen.getByRole('button',{name:'Keep & next melody'}));
+    await waitFor(async () => assert.equal((await latestLab())?.takes.length,2));
+    await waitFor(() => assert.ok(screen.getByRole('heading',{name:'Same note, new syllable'})));
+    const saved = (await latestLab())!;
+    assert.equal(saved.takes[0].style,'daa');
+    assert.equal(saved.takes[0].trialKey,saved.takes[1].trialKey);
+    assert.notEqual(saved.takes[0].id,saved.takes[1].id);
+    fireEvent.change(screen.getByLabelText('Listening through'),{target:{value:'speakers'}});
+    const guide = screen.getByRole('checkbox',{name:'Play the melody while I record'}) as HTMLInputElement;
+    assert.equal(guide.checked,false);
+    assert.equal(guide.disabled,true);
+    view.unmount();
+    render(<TuningCenter />);
+    await waitFor(() => assert.ok(screen.getByRole('button',{name:'Export session (2 takes)'})));
+  } finally {
+    cleanup();
+    Object.defineProperty(AnalysisClient.prototype, 'analyze', oldAnalyze);
+    for (const key of Object.keys(overrides)) Object.defineProperty(AudioEngine.prototype,key,oldMethods[key]);
+    if (oldPause) Object.defineProperty(dom.window.HTMLMediaElement.prototype,'pause',oldPause);
+    globalThis.AudioWorkletNode = oldWorklet;
+    if (oldMedia) Object.defineProperty(navigator,'mediaDevices',oldMedia); else Reflect.deleteProperty(navigator,'mediaDevices');
+  }
 });
