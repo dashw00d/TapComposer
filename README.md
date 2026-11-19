@@ -185,4 +185,4 @@ For a measured view of humming accuracy, [MODEL_EVALUATION.md](./MODEL_EVALUATIO
 
 ## License
 
-No license file is currently included in this repository, so all rights are reserved by default. Bundled sounds, models and the MP3 encoder carry their own attributions; see [THIRD_PARTY_NOTICES.md](./THIRD_PARTY_NOTICES.md).
+TapComposer's own code is released under the [MIT License](LICENSE). Bundled sounds, models and the MP3 encoder carry their own attributions; see [THIRD_PARTY_NOTICES.md](./THIRD_PARTY_NOTICES.md).
